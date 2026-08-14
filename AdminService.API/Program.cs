@@ -92,6 +92,8 @@ try
     builder.Services.AddDbContext<AdminDbContext>(options =>
         options.UseSqlServer(builder.Configuration.GetConnectionString("AdminDb")));
 
+    builder.Services.AddHttpContextAccessor();
+    builder.Services.AddHttpClient();
     builder.Services.AddScoped<IAdminDashboardService, AdminDashboardService>();
 
     var app = builder.Build();

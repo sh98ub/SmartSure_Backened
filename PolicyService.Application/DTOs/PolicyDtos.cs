@@ -68,6 +68,10 @@ namespace PolicyService.Application.DTOs
     {
         [Range(1, int.MaxValue, ErrorMessage = "Valid PolicyPlanId is required.")]
         public int PolicyPlanId { get; set; }
+
+        public bool HasPreExistingConditions { get; set; }
+        public bool IsSmoker { get; set; }
+        public bool HasRecentHospitalization { get; set; }
     }
 
     public class SubscribePolicyDto
@@ -76,6 +80,10 @@ namespace PolicyService.Application.DTOs
 
         [Range(1, int.MaxValue, ErrorMessage = "Valid PolicyPlanId is required.")]
         public int PolicyPlanId { get; set; }
+
+        public bool HasPreExistingConditions { get; set; }
+        public bool IsSmoker { get; set; }
+        public bool HasRecentHospitalization { get; set; }
     }
 
     public class UserPolicyDto
@@ -90,5 +98,9 @@ namespace PolicyService.Application.DTOs
         public DateTime StartDate { get; set; }
         public DateTime EndDate { get; set; }
         public string Status { get; set; } = string.Empty;
+
+        public bool HasPreExistingConditions { get; set; }
+        public bool IsSmoker { get; set; }
+        public bool HasRecentHospitalization { get; set; }
     }
 }

@@ -19,12 +19,13 @@ namespace PolicyService.Domain
         public int Id { get; set; }
         public int UserId { get; set; }
         public int PolicyPlanId { get; set; }
-        public string PolicyNumber { get; set; } = string.Empty;
-        public PolicyType Type { get; set; }
         public decimal PremiumAmount { get; set; }
         public decimal CoverageLimit { get; set; }
         public DateTime StartDate { get; set; } = DateTime.UtcNow;
         public DateTime EndDate { get; set; }
         public PolicyStatus Status { get; set; } = PolicyStatus.Active;
+        public bool HasPreExistingConditions { get; set; }
+        public bool IsSmoker { get; set; }
+        public bool HasRecentHospitalization { get; set; }
     }
 }

@@ -108,7 +108,6 @@ try
             dbContext.Database.ExecuteSqlRaw("DBCC CHECKIDENT ('Claims', RESEED, 300);");
             var sampleClaim = new Claim
             {
-                ClaimNumber = "CLM-2026-00301",
                 UserPolicyId = 201,
                 UserId = 1,
                 IncidentDate = DateTime.UtcNow.AddDays(-10),

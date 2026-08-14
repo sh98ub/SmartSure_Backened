@@ -62,7 +62,6 @@ namespace ClaimService.Infrastructure.Services
 
             var claim = new Claim
             {
-                ClaimNumber = "CLM-2026-TEMP",
                 UserPolicyId = dto.UserPolicyId,
                 UserId = dto.UserId ?? 1,
                 IncidentDate = incidentDate,
@@ -75,10 +74,6 @@ namespace ClaimService.Infrastructure.Services
             };
 
             _context.Claims.Add(claim);
-            await _context.SaveChangesAsync();
-
-            // Set the ClaimNumber using the generated database ID
-            claim.ClaimNumber = "CLM-2026-" + claim.Id;
             await _context.SaveChangesAsync();
 
             return MapToDto(claim);
@@ -144,7 +139,7 @@ namespace ClaimService.Infrastructure.Services
             return new ClaimDto
             {
                 Id = claim.Id,
-                ClaimNumber = claim.ClaimNumber,
+                ClaimNumber = "CLM-2026-" + claim.Id,
                 UserPolicyId = claim.UserPolicyId,
                 UserId = claim.UserId,
                 IncidentDate = claim.IncidentDate,

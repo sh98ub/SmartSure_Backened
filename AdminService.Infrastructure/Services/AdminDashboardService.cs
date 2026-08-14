@@ -32,8 +32,8 @@ namespace AdminService.Infrastructure.Services
             _context = context;
             _httpClient = httpClient;
             _httpContextAccessor = httpContextAccessor;
-            _claimServiceUrl = configuration.GetSection("ServiceUrls")?["ClaimService"] ?? "http://localhost:5003";
-            _policyServiceUrl = configuration.GetSection("ServiceUrls")?["PolicyService"] ?? "http://localhost:5002";
+            _claimServiceUrl = configuration?.GetSection("ServiceUrls")?["ClaimService"] ?? "http://localhost:5003";
+            _policyServiceUrl = configuration?.GetSection("ServiceUrls")?["PolicyService"] ?? "http://localhost:5002";
         }
 
         private class ClaimSummaryInfo
@@ -222,8 +222,6 @@ namespace AdminService.Infrastructure.Services
                 Username = user.Username,
                 Email = user.Email,
                 FullName = user.FullName,
-                PhoneNumber = user.PhoneNumber,
-                Address = user.Address,
                 KycStatus = user.KycStatus,
                 Role = user.Role,
                 CreatedAt = user.CreatedAt,

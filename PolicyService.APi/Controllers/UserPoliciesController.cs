@@ -41,7 +41,10 @@ namespace PolicyService.APi.Controllers
             var serviceDto = new SubscribePolicyDto
             {
                 PolicyPlanId = dto.PolicyPlanId,
-                UserId = userId
+                UserId = userId,
+                HasPreExistingConditions = dto.HasPreExistingConditions,
+                IsSmoker = dto.IsSmoker,
+                HasRecentHospitalization = dto.HasRecentHospitalization
             };
 
             var policy = await _policyService.SubscribePolicyAsync(serviceDto);

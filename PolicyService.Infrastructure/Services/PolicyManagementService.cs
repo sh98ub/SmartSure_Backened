@@ -98,35 +98,44 @@ namespace PolicyService.Infrastructure.Services
             {
                 UserId = dto.UserId,
                 PolicyPlanId = plan.Id,
-                PolicyNumber = "POL-2026-TEMP",
-                Type = plan.Type,
                 PremiumAmount = plan.BasePremium,
                 CoverageLimit = plan.CoverageLimit,
                 StartDate = DateTime.UtcNow,
                 EndDate = DateTime.UtcNow.AddMonths(plan.DurationMonths),
-                Status = PolicyStatus.Active
+                Status = PolicyStatus.Active,
+                HasPreExistingConditions = dto.HasPreExistingConditions,
+                IsSmoker = dto.IsSmoker,
+                HasRecentHospitalization = dto.HasRecentHospitalization
             };
 
             _context.UserPolicies.Add(policy);
             await _context.SaveChangesAsync();
 
-            // Set the PolicyNumber using the generated database ID
-            policy.PolicyNumber = "POL-2026-" + policy.Id;
-            await _context.SaveChangesAsync();
-
-            return MapToUserPolicyDto(policy);
+            return MapToUserPolicyDto(policy, plan.Type.ToString());
         }
 
         public async Task<IEnumerable<UserPolicyDto>> GetUserPoliciesAsync(int userId)
         {
             var policies = await _context.UserPolicies.Where(p => p.UserId == userId).ToListAsync();
-            return policies.Select(MapToUserPolicyDto).ToList();
+            var planIds = policies.Select(p => p.PolicyPlanId).Distinct().ToList();
+            var plans = await _context.PolicyPlans.Where(p => planIds.Contains(p.Id)).ToDictionaryAsync(p => p.Id, p => p.Type.ToString());
+
+            return policies.Select(p => {
+                plans.TryGetValue(p.PolicyPlanId, out var type);
+                return MapToUserPolicyDto(p, type ?? string.Empty);
+            }).ToList();
         }
 
         public async Task<IEnumerable<UserPolicyDto>> GetAllUserPoliciesAsync()
         {
             var policies = await _context.UserPolicies.ToListAsync();
-            return policies.Select(MapToUserPolicyDto).ToList();
+            var planIds = policies.Select(p => p.PolicyPlanId).Distinct().ToList();
+            var plans = await _context.PolicyPlans.Where(p => planIds.Contains(p.Id)).ToDictionaryAsync(p => p.Id, p => p.Type.ToString());
+
+            return policies.Select(p => {
+                plans.TryGetValue(p.PolicyPlanId, out var type);
+                return MapToUserPolicyDto(p, type ?? string.Empty);
+            }).ToList();
         }
 
         public async Task<UserPolicyDto?> GetUserPolicyByIdAsync(int id)
@@ -136,7 +145,8 @@ namespace PolicyService.Infrastructure.Services
             {
                 throw new UserPolicyNotFoundException(id);
             }
-            return MapToUserPolicyDto(policy);
+            var plan = await _context.PolicyPlans.FindAsync(policy.PolicyPlanId);
+            return MapToUserPolicyDto(policy, plan?.Type.ToString() ?? string.Empty);
         }
 
         public async Task<bool> CancelUserPolicyAsync(int id)
@@ -172,20 +182,23 @@ namespace PolicyService.Infrastructure.Services
             };
         }
 
-        private static UserPolicyDto MapToUserPolicyDto(UserPolicy policy)
+        private static UserPolicyDto MapToUserPolicyDto(UserPolicy policy, string type)
         {
             return new UserPolicyDto
             {
                 Id = policy.Id,
                 UserId = policy.UserId,
                 PolicyPlanId = policy.PolicyPlanId,
-                PolicyNumber = policy.PolicyNumber,
-                Type = policy.Type.ToString(),
+                PolicyNumber = "POL-2026-" + policy.Id,
+                Type = type,
                 PremiumAmount = policy.PremiumAmount,
                 CoverageLimit = policy.CoverageLimit,
                 StartDate = policy.StartDate,
                 EndDate = policy.EndDate,
-                Status = policy.Status.ToString()
+                Status = policy.Status.ToString(),
+                HasPreExistingConditions = policy.HasPreExistingConditions,
+                IsSmoker = policy.IsSmoker,
+                HasRecentHospitalization = policy.HasRecentHospitalization
             };
         }
     }

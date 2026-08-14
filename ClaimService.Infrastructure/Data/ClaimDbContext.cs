@@ -16,7 +16,6 @@ namespace ClaimService.Infrastructure.Data
             modelBuilder.Entity<Claim>(entity =>
             {
                 entity.HasKey(c => c.Id);
-                entity.Property(c => c.ClaimNumber).IsRequired().HasMaxLength(50);
                 entity.Property(c => c.ClaimAmount).HasColumnType("decimal(18,2)");
                 entity.Property(c => c.ApprovedPayoutAmount).HasColumnType("decimal(18,2)");
             });

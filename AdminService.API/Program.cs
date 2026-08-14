@@ -133,9 +133,9 @@ try
         {
             dbContext.UserOverviews.AddRange(new AdminUserOverview[]
             {
-                new AdminUserOverview { Username = "admin", Email = "admin@smartsure.com", FullName = "System Administrator", PhoneNumber = "+91-9876543210", Address = "HQ Building, Connaught Place, New Delhi", KycStatus = "Verified", Role = "Admin", CreatedAt = DateTime.UtcNow, IsActive = true },
-                new AdminUserOverview { Username = "adjuster", Email = "adjuster@smartsure.com", FullName = "Senior Claims Adjuster", PhoneNumber = "+91-9876543211", Address = "Financial Center, BKC, Mumbai", KycStatus = "Verified", Role = "ClaimsAdjuster", CreatedAt = DateTime.UtcNow, IsActive = true },
-                new AdminUserOverview { Username = "john_doe", Email = "john@example.com", FullName = "John Doe", PhoneNumber = "+91-9876543212", Address = "Flat 402, MG Road, Bengaluru", KycStatus = "Verified", Role = "PolicyHolder", CreatedAt = DateTime.UtcNow, IsActive = true }
+                new AdminUserOverview { Username = "admin", Email = "admin@smartsure.com", FullName = "System Administrator", KycStatus = "Verified", Role = "Admin", CreatedAt = DateTime.UtcNow, IsActive = true },
+                new AdminUserOverview { Username = "adjuster", Email = "adjuster@smartsure.com", FullName = "Senior Claims Adjuster", KycStatus = "Verified", Role = "ClaimsAdjuster", CreatedAt = DateTime.UtcNow, IsActive = true },
+                new AdminUserOverview { Username = "john_doe", Email = "john@example.com", FullName = "John Doe", KycStatus = "Verified", Role = "PolicyHolder", CreatedAt = DateTime.UtcNow, IsActive = true }
             });
             dbContext.SaveChanges();
         }

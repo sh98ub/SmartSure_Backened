@@ -37,8 +37,6 @@ namespace AuthService.Infrasturcture.Services
                 Email = dto.Email,
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password, workFactor: 12),
                 FullName = dto.Name,
-                PhoneNumber = "Not Specified",
-                Address = "Not Specified",
                 KycStatus = "Pending",
                 Role = UserRole.PolicyHolder,  // always force PolicyHolder — never trust user input
                 CreatedAt = DateTime.UtcNow,
@@ -119,8 +117,6 @@ namespace AuthService.Infrasturcture.Services
                 Username = user.Username,
                 Email = user.Email,
                 FullName = user.FullName,
-                PhoneNumber = user.PhoneNumber,
-                Address = user.Address,
                 KycStatus = user.KycStatus,
                 Role = user.Role.ToString(),
                 CreatedAt = user.CreatedAt,

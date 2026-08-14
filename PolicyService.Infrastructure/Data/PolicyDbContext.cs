@@ -25,7 +25,6 @@ namespace PolicyService.Infrastructure.Data
             modelBuilder.Entity<UserPolicy>(entity =>
             {
                 entity.HasKey(up => up.Id);
-                entity.Property(up => up.PolicyNumber).IsRequired().HasMaxLength(50);
                 entity.Property(up => up.PremiumAmount).HasColumnType("decimal(18,2)");
                 entity.Property(up => up.CoverageLimit).HasColumnType("decimal(18,2)");
             });

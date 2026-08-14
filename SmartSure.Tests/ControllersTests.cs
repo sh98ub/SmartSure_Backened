@@ -19,16 +19,45 @@ using PolicyService.Application.DTOs;
 using PolicyService.Infrastructure.Services;
 using Xunit;
 using Shared.Models;
+using Microsoft.EntityFrameworkCore;
+using ClaimService.Infrastructure.Data;
+using PolicyService.Infrastructure.Data;
+using PolicyService.Domain;
 
 namespace SmartSure.Tests
 {
     public class ControllersTests
     {
+        private ClaimDbContext GetClaimDbContext()
+        {
+            var options = new DbContextOptionsBuilder<ClaimDbContext>()
+                .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
+                .Options;
+            return new ClaimDbContext(options);
+        }
+
+        private PolicyDbContext GetPolicyDbContext()
+        {
+            var options = new DbContextOptionsBuilder<PolicyDbContext>()
+                .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
+                .Options;
+            var context = new PolicyDbContext(options);
+            context.PolicyPlans.Add(new PolicyPlan 
+            { 
+                Id = 101, 
+                Title = "Comprehensive Health Plan", 
+                IsActive = true,
+                Type = PolicyType.Health
+            });
+            context.SaveChanges();
+            return context;
+        }
+
         [Fact]
         public async Task UserClaimsController_GetClaimById_OwnClaim_ShouldReturnOk()
         {
             // Arrange
-            var claimService = new ClaimProcessingService();
+            var claimService = new ClaimProcessingService(GetClaimDbContext());
             var controller = new UserClaimsController(claimService);
             controller.ControllerContext = new ControllerContext
             {
@@ -63,7 +92,7 @@ namespace SmartSure.Tests
         public async Task UserClaimsController_GetClaimById_OtherUserClaim_ShouldReturnForbidden()
         {
             // Arrange
-            var claimService = new ClaimProcessingService();
+            var claimService = new ClaimProcessingService(GetClaimDbContext());
             var controller = new UserClaimsController(claimService);
             controller.ControllerContext = new ControllerContext
             {
@@ -96,7 +125,7 @@ namespace SmartSure.Tests
         public async Task AdminClaimsController_GetAllClaims_ShouldReturnClaimsList()
         {
             // Arrange
-            var claimService = new ClaimProcessingService();
+            var claimService = new ClaimProcessingService(GetClaimDbContext());
             var controller = new AdminClaimsController(claimService);
 
             // Act
@@ -113,7 +142,7 @@ namespace SmartSure.Tests
         public async Task UserPoliciesController_GetPolicyById_OtherUserPolicy_ShouldReturnForbidden()
         {
             // Arrange
-            var policyService = new PolicyManagementService();
+            var policyService = new PolicyManagementService(GetPolicyDbContext());
             var controller = new UserPoliciesController(policyService);
             controller.ControllerContext = new ControllerContext
             {
@@ -144,7 +173,7 @@ namespace SmartSure.Tests
         public async Task UserPoliciesController_CancelPolicy_OtherUserPolicy_ShouldReturnForbidden()
         {
             // Arrange
-            var policyService = new PolicyManagementService();
+            var policyService = new PolicyManagementService(GetPolicyDbContext());
             var controller = new UserPoliciesController(policyService);
             controller.ControllerContext = new ControllerContext
             {
@@ -175,7 +204,7 @@ namespace SmartSure.Tests
         public async Task AdminPoliciesController_CreatePlan_ShouldReturnCreatedPlan()
         {
             // Arrange
-            var policyService = new PolicyManagementService();
+            var policyService = new PolicyManagementService(GetPolicyDbContext());
             var controller = new AdminPoliciesController(policyService);
 
             var dto = new CreatePolicyPlanDto

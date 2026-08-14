@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using AdminService.Application.DTOs;
@@ -17,17 +18,121 @@ using PolicyService.Domain;
 using PolicyService.Domain.Exceptions;
 using PolicyService.Infrastructure.Services;
 using Xunit;
+using Microsoft.EntityFrameworkCore;
+using AuthService.Infrasturcture.Data;
+using PolicyService.Infrastructure.Data;
+using ClaimService.Infrastructure.Data;
+using AdminService.Infrastructure.Data;
+using AdminService.Domain;
 
 namespace SmartSure.Tests
 {
     public class ServicesTests
     {
+        private AuthDbContext GetAuthDbContext()
+        {
+            var options = new DbContextOptionsBuilder<AuthDbContext>()
+                .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
+                .Options;
+            var context = new AuthDbContext(options);
+            context.Users.AddRange(new User[]
+            {
+                new User
+                {
+                    Id = 1,
+                    Username = "admin",
+                    Email = "admin@smartsure.com",
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin@123", workFactor: 12),
+                    FullName = "System Administrator",
+                    KycStatus = "Verified",
+                    Role = UserRole.Admin,
+                    CreatedAt = DateTime.UtcNow,
+                    IsActive = true
+                },
+                new User
+                {
+                    Id = 2,
+                    Username = "adjuster",
+                    Email = "adjuster@smartsure.com",
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword("Adjuster@123", workFactor: 12),
+                    FullName = "Senior Claims Adjuster",
+                    KycStatus = "Verified",
+                    Role = UserRole.ClaimsAdjuster,
+                    CreatedAt = DateTime.UtcNow,
+                    IsActive = true
+                },
+                new User
+                {
+                    Id = 3,
+                    Username = "john_doe",
+                    Email = "john@example.com",
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword("User@123", workFactor: 12),
+                    FullName = "John Doe",
+                    KycStatus = "Verified",
+                    Role = UserRole.PolicyHolder,
+                    CreatedAt = DateTime.UtcNow,
+                    IsActive = true
+                }
+            });
+            context.SaveChanges();
+            return context;
+        }
+
+        private PolicyDbContext GetPolicyDbContext()
+        {
+            var options = new DbContextOptionsBuilder<PolicyDbContext>()
+                .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
+                .Options;
+            var context = new PolicyDbContext(options);
+            context.PolicyPlans.Add(new PolicyPlan 
+            { 
+                Id = 101, 
+                Title = "Comprehensive Health Plan", 
+                IsActive = true,
+                Type = PolicyType.Health
+            });
+            context.SaveChanges();
+            return context;
+        }
+
+        private ClaimDbContext GetClaimDbContext()
+        {
+            var options = new DbContextOptionsBuilder<ClaimDbContext>()
+                .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
+                .Options;
+            return new ClaimDbContext(options);
+        }
+
+        private AdminDbContext GetAdminDbContext()
+        {
+            var options = new DbContextOptionsBuilder<AdminDbContext>()
+                .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
+                .Options;
+            var context = new AdminDbContext(options);
+            context.UserOverviews.AddRange(new AdminUserOverview[]
+            {
+                new AdminUserOverview { Id = 1, Username = "admin", Email = "admin@smartsure.com", FullName = "System Administrator", KycStatus = "Verified", Role = "Admin", CreatedAt = DateTime.UtcNow, IsActive = true },
+                new AdminUserOverview { Id = 2, Username = "adjuster", Email = "adjuster@smartsure.com", FullName = "Senior Claims Adjuster", KycStatus = "Verified", Role = "ClaimsAdjuster", CreatedAt = DateTime.UtcNow, IsActive = true },
+                new AdminUserOverview { Id = 3, Username = "john_doe", Email = "john@example.com", FullName = "John Doe", KycStatus = "Verified", Role = "PolicyHolder", CreatedAt = DateTime.UtcNow, IsActive = true }
+            });
+            context.AuditLogs.Add(new AuditLog
+            {
+                Id = 1,
+                Timestamp = DateTime.UtcNow,
+                Actor = "Admin",
+                Action = "Create Plan",
+                Details = "Created plan"
+            });
+            context.SaveChanges();
+            return context;
+        }
+
         [Fact]
         public async Task AuthService_UserRegistrationAndLogin_ShouldSucceed()
         {
             // Arrange
             var jwtGen = new JwtTokenGenerator();
-            var userService = new UserService(jwtGen);
+            var userService = new UserService(GetAuthDbContext(), jwtGen);
             var registerDto = new RegisterDto
             {
                 Email = "testuser@example.com",
@@ -63,7 +168,7 @@ namespace SmartSure.Tests
         {
             // Arrange
             var jwtGen = new JwtTokenGenerator();
-            var userService = new UserService(jwtGen);
+            var userService = new UserService(GetAuthDbContext(), jwtGen);
             var email = "simple_" + Guid.NewGuid().ToString("N").Substring(0, 6) + "@example.com";
             var registerDto = new RegisterDto
             {
@@ -98,7 +203,7 @@ namespace SmartSure.Tests
         {
             // Arrange
             var jwtGen = new JwtTokenGenerator();
-            var userService = new UserService(jwtGen);
+            var userService = new UserService(GetAuthDbContext(), jwtGen);
             var adminLoginDto = new LoginDto
             {
                 Username = "admin",
@@ -120,7 +225,7 @@ namespace SmartSure.Tests
         {
             // Arrange
             var jwtGen = new JwtTokenGenerator();
-            var userService = new UserService(jwtGen);
+            var userService = new UserService(GetAuthDbContext(), jwtGen);
 
             // Act & Assert
             await Assert.ThrowsAsync<UserAlreadyExistsException>(async () =>
@@ -139,7 +244,7 @@ namespace SmartSure.Tests
         {
             // Arrange
             var jwtGen = new JwtTokenGenerator();
-            var userService = new UserService(jwtGen);
+            var userService = new UserService(GetAuthDbContext(), jwtGen);
 
             // Act & Assert
             await Assert.ThrowsAsync<InvalidCredentialsException>(async () =>
@@ -156,7 +261,7 @@ namespace SmartSure.Tests
         public async Task PolicyService_GetPlansAndSubscribe_ShouldCreateActiveUserPolicy()
         {
             // Arrange
-            var policyService = new PolicyManagementService();
+            var policyService = new PolicyManagementService(GetPolicyDbContext());
 
             // Act
             var plans = await policyService.GetPolicyPlansAsync();
@@ -190,7 +295,7 @@ namespace SmartSure.Tests
         public async Task PolicyService_SubscribeInvalidPlan_ShouldThrowPolicyPlanNotFoundException()
         {
             // Arrange
-            var policyService = new PolicyManagementService();
+            var policyService = new PolicyManagementService(GetPolicyDbContext());
 
             // Act & Assert
             await Assert.ThrowsAsync<PolicyPlanNotFoundException>(async () =>
@@ -207,7 +312,7 @@ namespace SmartSure.Tests
         public async Task ClaimService_SubmitAndReviewClaim_ShouldUpdateStatusAndPayout()
         {
             // Arrange
-            var claimService = new ClaimProcessingService();
+            var claimService = new ClaimProcessingService(GetClaimDbContext());
             int userId = 101;
             int policyId = 1;
 
@@ -251,7 +356,7 @@ namespace SmartSure.Tests
         public async Task ClaimService_InvalidClaimAmount_ShouldThrowInvalidClaimAmountException()
         {
             // Arrange
-            var claimService = new ClaimProcessingService();
+            var claimService = new ClaimProcessingService(GetClaimDbContext());
 
             // Act & Assert
             await Assert.ThrowsAsync<InvalidClaimAmountException>(async () =>
@@ -270,9 +375,9 @@ namespace SmartSure.Tests
         public async Task AdminCreatesPolicy_UserBuysPolicy_UserClaims_AdminApproves_EndToEndWorkflow()
         {
             // 1. Setup Services
-            var policyService = new PolicyManagementService();
-            var claimService = new ClaimProcessingService();
-            var adminService = new AdminDashboardService();
+            var policyService = new PolicyManagementService(GetPolicyDbContext());
+            var claimService = new ClaimProcessingService(GetClaimDbContext());
+            var adminService = new AdminDashboardService(GetAdminDbContext(), null!, null!, null!);
 
             // 2. Admin creates a new Policy Plan
             var newPlanDto = new CreatePolicyPlanDto
@@ -338,7 +443,7 @@ namespace SmartSure.Tests
         public async Task AdminService_GetMetricsAndAuditLogs_ShouldReturnValidData()
         {
             // Arrange
-            var adminService = new AdminDashboardService();
+            var adminService = new AdminDashboardService(GetAdminDbContext(), null!, null!, null!);
 
             // Act
             var metrics = await adminService.GetDashboardMetricsAsync();
@@ -356,7 +461,7 @@ namespace SmartSure.Tests
         public async Task AdminService_UserManagement_ShouldReturnFullUserDetailsAndUpdateStatus()
         {
             // Arrange
-            var adminService = new AdminDashboardService();
+            var adminService = new AdminDashboardService(GetAdminDbContext(), null!, null!, null!);
 
             // Act - Fetch All Users
             var users = await adminService.GetUserOverviewListAsync();
@@ -366,8 +471,6 @@ namespace SmartSure.Tests
             Assert.NotEmpty(userList);
             var john = userList.FirstOrDefault(u => u.Username == "john_doe");
             Assert.NotNull(john);
-            Assert.False(string.IsNullOrEmpty(john.PhoneNumber));
-            Assert.False(string.IsNullOrEmpty(john.Address));
             Assert.Equal("Verified", john.KycStatus);
 
             // Act - Update Status & KYC

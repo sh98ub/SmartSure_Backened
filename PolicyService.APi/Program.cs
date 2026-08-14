@@ -122,13 +122,14 @@ try
             {
                 UserId = 1,
                 PolicyPlanId = 101,
-                PolicyNumber = "POL-2026-201",
-                Type = PolicyType.Health,
                 PremiumAmount = 2500.00m,
                 CoverageLimit = 500000.00m,
                 StartDate = DateTime.UtcNow.AddDays(-10),
                 EndDate = DateTime.UtcNow.AddDays(-10).AddMonths(12),
-                Status = PolicyStatus.Active
+                Status = PolicyStatus.Active,
+                HasPreExistingConditions = false,
+                IsSmoker = false,
+                HasRecentHospitalization = false
             };
             dbContext.UserPolicies.Add(defaultPolicy);
             dbContext.SaveChanges();

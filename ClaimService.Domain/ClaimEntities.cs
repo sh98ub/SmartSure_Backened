@@ -14,7 +14,6 @@ namespace ClaimService.Domain
     public class Claim
     {
         public int Id { get; set; }
-        public string ClaimNumber { get; set; } = string.Empty;
         public int UserPolicyId { get; set; }
         public int UserId { get; set; }
         public DateTime IncidentDate { get; set; }

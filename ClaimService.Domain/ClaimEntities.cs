@@ -19,7 +19,6 @@ namespace ClaimService.Domain
         public DateTime IncidentDate { get; set; }
         public decimal ClaimAmount { get; set; }
         public string Description { get; set; } = string.Empty;
-        public string SupportingDocumentUrl { get; set; } = string.Empty;
         public ClaimStatus Status { get; set; } = ClaimStatus.Submitted;
         public string Remarks { get; set; } = string.Empty;
         public DateTime SubmittedAt { get; set; } = DateTime.UtcNow;

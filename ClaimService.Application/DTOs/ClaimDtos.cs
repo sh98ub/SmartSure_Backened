@@ -9,18 +9,12 @@ namespace ClaimService.Application.DTOs
         [Range(1, int.MaxValue, ErrorMessage = "Valid UserPolicyId is required.")]
         public int UserPolicyId { get; set; }
 
-        public int? UserId { get; set; }
-
-        public DateTime? IncidentDate { get; set; }
-
         [Range(0.01, double.MaxValue, ErrorMessage = "Claim amount must be greater than zero.")]
         public decimal ClaimAmount { get; set; }
 
         [Required(ErrorMessage = "Description is required.")]
         [StringLength(1000, ErrorMessage = "Description cannot exceed 1000 characters.")]
         public string Description { get; set; } = string.Empty;
-
-        public string SupportingDocumentUrl { get; set; } = string.Empty;
     }
 
     public class ReviewClaimDto
@@ -47,7 +41,6 @@ namespace ClaimService.Application.DTOs
         public DateTime IncidentDate { get; set; }
         public decimal ClaimAmount { get; set; }
         public string Description { get; set; } = string.Empty;
-        public string SupportingDocumentUrl { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
         public string Remarks { get; set; } = string.Empty;
         public DateTime SubmittedAt { get; set; }

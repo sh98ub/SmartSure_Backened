@@ -100,7 +100,7 @@ try
     using (var scope = app.Services.CreateScope())
     {
         var dbContext = scope.ServiceProvider.GetRequiredService<PolicyDbContext>();
-        dbContext.Database.EnsureCreated();
+        dbContext.Database.Migrate();
         
         if (!dbContext.PolicyPlans.Any())
         {
@@ -108,6 +108,9 @@ try
             dbContext.PolicyPlans.AddRange(new PolicyPlan[]
             {
                 new PolicyPlan { Title = "Comprehensive Health Plan", Description = "Full medical, hospitalization, and emergency coverage across 5000+ network hospitals in India.", Type = PolicyType.Health, BasePremium = 2500.00m, CoverageLimit = 500000.00m, DurationMonths = 12, IsActive = true },
+                new PolicyPlan { Title = "Family Health Care Plus", Description = "Affordable family medical coverage including outpatient care, maternity cover, and diagnostic checkups.", Type = PolicyType.Health, BasePremium = 4500.00m, CoverageLimit = 800000.00m, DurationMonths = 12, IsActive = true },
+                new PolicyPlan { Title = "Senior Citizen Care Shield", Description = "Dedicated medical cover for seniors over 60, including pre-existing illnesses, daily hospital cash, and geriatric support.", Type = PolicyType.Health, BasePremium = 6000.00m, CoverageLimit = 600000.00m, DurationMonths = 12, IsActive = true },
+                new PolicyPlan { Title = "Critical Illness Premium Cover", Description = "High-limit coverage targeting key critical illnesses including cardiac, oncology, renal care, and advanced surgeries.", Type = PolicyType.Health, BasePremium = 3500.00m, CoverageLimit = 1500000.00m, DurationMonths = 12, IsActive = true },
                 new PolicyPlan { Title = "Executive Auto Shield", Description = "Comprehensive motor vehicle collision, third-party liability, and theft protection.", Type = PolicyType.Auto, BasePremium = 1800.00m, CoverageLimit = 350000.00m, DurationMonths = 12, IsActive = true },
                 new PolicyPlan { Title = "Homeowner Security Guard", Description = "Property damage, natural disaster, and burglary coverage.", Type = PolicyType.Home, BasePremium = 1200.00m, CoverageLimit = 1500000.00m, DurationMonths = 12, IsActive = true },
                 new PolicyPlan { Title = "Life Protector Supreme", Description = "Term life policy with critical illness benefit and terminal cover.", Type = PolicyType.Life, BasePremium = 3000.00m, CoverageLimit = 2500000.00m, DurationMonths = 12, IsActive = true }

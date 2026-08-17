@@ -22,6 +22,7 @@ namespace AdminService.Infrastructure.Services
         private readonly IHttpContextAccessor _httpContextAccessor;
         private readonly string _claimServiceUrl;
         private readonly string _policyServiceUrl;
+        private readonly string _authServiceUrl;
 
         public AdminDashboardService(
             AdminDbContext context, 
@@ -34,6 +35,7 @@ namespace AdminService.Infrastructure.Services
             _httpContextAccessor = httpContextAccessor;
             _claimServiceUrl = configuration?.GetSection("ServiceUrls")?["ClaimService"] ?? "http://localhost:5003";
             _policyServiceUrl = configuration?.GetSection("ServiceUrls")?["PolicyService"] ?? "http://localhost:5002";
+            _authServiceUrl = configuration?.GetSection("ServiceUrls")?["AuthService"] ?? "http://localhost:5001";
         }
 
         private class ClaimSummaryInfo
@@ -50,8 +52,20 @@ namespace AdminService.Infrastructure.Services
 
         public async Task<SystemDashboardMetricsDto> GetDashboardMetricsAsync()
         {
-            var totalUsers = await _context.UserOverviews.CountAsync();
-            var activeUsersCount = await _context.UserOverviews.CountAsync(u => u.IsActive);
+            int totalUsers = 0;
+            int activeUsersCount = 0;
+
+            var users = await FetchFromAuthServiceAsync<List<AdminUserOverviewDto>>("api/auth/admin/users");
+            if (users != null)
+            {
+                totalUsers = users.Count;
+                activeUsersCount = users.Count(u => u.IsActive);
+            }
+            else
+            {
+                totalUsers = 3;
+                activeUsersCount = 3;
+            }
 
             int pendingClaims = 0;
             int approvedClaims = 0;
@@ -63,7 +77,7 @@ namespace AdminService.Infrastructure.Services
             try
             {
                 var request = new HttpRequestMessage(HttpMethod.Get, $"{_claimServiceUrl}/api/claims/admin");
-                var authHeader = _httpContextAccessor.HttpContext?.Request.Headers["Authorization"].ToString();
+                var authHeader = _httpContextAccessor?.HttpContext?.Request.Headers["Authorization"].ToString();
                 if (!string.IsNullOrEmpty(authHeader))
                 {
                     request.Headers.Add("Authorization", authHeader);
@@ -107,7 +121,7 @@ namespace AdminService.Infrastructure.Services
             try
             {
                 var request = new HttpRequestMessage(HttpMethod.Get, $"{_policyServiceUrl}/api/policies/admin/subscriptions");
-                var authHeader = _httpContextAccessor.HttpContext?.Request.Headers["Authorization"].ToString();
+                var authHeader = _httpContextAccessor?.HttpContext?.Request.Headers["Authorization"].ToString();
                 if (!string.IsNullOrEmpty(authHeader))
                 {
                     request.Headers.Add("Authorization", authHeader);
@@ -169,36 +183,123 @@ namespace AdminService.Infrastructure.Services
 
         public async Task<IEnumerable<AdminUserOverviewDto>> GetUserOverviewListAsync()
         {
-            var users = await _context.UserOverviews.ToListAsync();
-            return users.Select(MapToUserOverviewDto).ToList();
+            var users = await FetchFromAuthServiceAsync<List<AdminUserOverviewDto>>("api/auth/admin/users");
+            return users ?? new List<AdminUserOverviewDto>();
         }
 
         public async Task<AdminUserOverviewDto?> GetUserOverviewByIdAsync(int id)
         {
-            var user = await _context.UserOverviews.FindAsync(id);
+            var user = await FetchFromAuthServiceAsync<AdminUserOverviewDto>($"api/auth/admin/users/{id}");
             if (user == null)
             {
-                throw new KeyNotFoundException($"User with ID '{id}' was not found.");
+                throw new KeyNotFoundException($"User with ID '{id}' was not found in AuthService.");
             }
-            return MapToUserOverviewDto(user);
+            return user;
         }
 
         public async Task<AdminUserOverviewDto> UpdateUserStatusAsync(int id, AdminUpdateUserStatusDto dto)
         {
-            var user = await _context.UserOverviews.FindAsync(id);
-            if (user == null)
+            try
             {
-                throw new KeyNotFoundException($"User with ID '{id}' was not found.");
+                var request = new HttpRequestMessage(HttpMethod.Put, $"{_authServiceUrl}/api/auth/admin/users/{id}/status");
+                var authHeader = _httpContextAccessor?.HttpContext?.Request.Headers["Authorization"].ToString();
+                if (!string.IsNullOrEmpty(authHeader))
+                {
+                    request.Headers.Add("Authorization", authHeader);
+                }
+
+                var updateDto = new
+                {
+                    IsActive = dto.IsActive
+                };
+
+                request.Content = new StringContent(
+                    JsonSerializer.Serialize(updateDto, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }),
+                    System.Text.Encoding.UTF8,
+                    "application/json"
+                );
+
+                var response = await _httpClient.SendAsync(request);
+                if (response.IsSuccessStatusCode)
+                {
+                    using var responseStream = await response.Content.ReadAsStreamAsync();
+                    var apiResponse = await JsonSerializer.DeserializeAsync<ApiResponse<AdminUserOverviewDto>>(
+                        responseStream, 
+                        new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+                    if (apiResponse != null && apiResponse.Success && apiResponse.Data != null)
+                    {
+                        return apiResponse.Data;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Failed to update user status in AuthService: {ex.Message}", ex);
             }
 
-            user.IsActive = dto.IsActive;
-            if (!string.IsNullOrWhiteSpace(dto.KycStatus))
-            {
-                user.KycStatus = dto.KycStatus;
-            }
+            throw new KeyNotFoundException($"User with ID '{id}' could not be updated or was not found in AuthService.");
+        }
 
-            await _context.SaveChangesAsync();
-            return MapToUserOverviewDto(user);
+        private async Task<T?> FetchFromAuthServiceAsync<T>(string path)
+        {
+            try
+            {
+                var request = new HttpRequestMessage(HttpMethod.Get, $"{_authServiceUrl}/{path}");
+                var authHeader = _httpContextAccessor?.HttpContext?.Request.Headers["Authorization"].ToString();
+                if (!string.IsNullOrEmpty(authHeader))
+                {
+                    request.Headers.Add("Authorization", authHeader);
+                }
+
+                var response = await _httpClient.SendAsync(request);
+                if (response.IsSuccessStatusCode)
+                {
+                    using var responseStream = await response.Content.ReadAsStreamAsync();
+                    var apiResponse = await JsonSerializer.DeserializeAsync<ApiResponse<T>>(
+                        responseStream, 
+                        new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+                    if (apiResponse != null && apiResponse.Success)
+                    {
+                        return apiResponse.Data;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error calling AuthService: {ex.Message}");
+            }
+            return default;
+        }
+
+        public async Task<object> GetUnapprovedClaimsAsync()
+        {
+            try
+            {
+                var request = new HttpRequestMessage(HttpMethod.Get, $"{_claimServiceUrl}/api/claims/admin/unapproved");
+                var authHeader = _httpContextAccessor?.HttpContext?.Request.Headers["Authorization"].ToString();
+                if (!string.IsNullOrEmpty(authHeader))
+                {
+                    request.Headers.Add("Authorization", authHeader);
+                }
+
+                var response = await _httpClient.SendAsync(request);
+                if (response.IsSuccessStatusCode)
+                {
+                    using var responseStream = await response.Content.ReadAsStreamAsync();
+                    var apiResponse = await JsonSerializer.DeserializeAsync<ApiResponse<object>>(
+                        responseStream, 
+                        new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+                    if (apiResponse != null && apiResponse.Success && apiResponse.Data != null)
+                    {
+                        return apiResponse.Data;
+                    }
+                }
+                throw new InvalidOperationException($"ClaimService responded with status: {response.StatusCode}");
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Failed to fetch unapproved claims from ClaimService: {ex.Message}", ex);
+            }
         }
 
         private static AuditLogDto MapToDto(AuditLog log)
@@ -211,21 +312,6 @@ namespace AdminService.Infrastructure.Services
                 Action = log.Action,
                 Details = log.Details,
                 IpAddress = log.IpAddress
-            };
-        }
-
-        private static AdminUserOverviewDto MapToUserOverviewDto(AdminUserOverview user)
-        {
-            return new AdminUserOverviewDto
-            {
-                Id = user.Id,
-                Username = user.Username,
-                Email = user.Email,
-                FullName = user.FullName,
-                KycStatus = user.KycStatus,
-                Role = user.Role,
-                CreatedAt = user.CreatedAt,
-                IsActive = user.IsActive
             };
         }
     }

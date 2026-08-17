@@ -12,5 +12,6 @@ namespace AdminService.Application.Interfaces
         Task<IEnumerable<AdminUserOverviewDto>> GetUserOverviewListAsync();
         Task<AdminUserOverviewDto?> GetUserOverviewByIdAsync(int id);
         Task<AdminUserOverviewDto> UpdateUserStatusAsync(int id, AdminUpdateUserStatusDto dto);
+        Task<object> GetUnapprovedClaimsAsync();
     }
 }

@@ -48,13 +48,19 @@ namespace Shared.Middleware
             {
                 statusCode = HttpStatusCode.NotFound;
             }
-            else if (exception.GetType().Name.Contains("AlreadyExistsException") || exception is ArgumentException || exception is InvalidOperationException)
-            {
-                statusCode = HttpStatusCode.BadRequest;
-            }
             else if (exception.GetType().Name.Contains("InvalidCredentialsException") || exception is UnauthorizedAccessException)
             {
                 statusCode = HttpStatusCode.Unauthorized;
+            }
+            else if (exception.GetType().Name.Contains("AlreadyExistsException") || 
+                     exception.GetType().Name.Contains("InvalidClaimAmountException") ||
+                     exception.GetType().Name.Contains("PolicyAlreadyCancelledException") ||
+                     exception.GetType().Name.Contains("Invalid") || 
+                     exception.GetType().Name.Contains("Already") || 
+                     exception is ArgumentException || 
+                     exception is InvalidOperationException)
+            {
+                statusCode = HttpStatusCode.BadRequest;
             }
 
             context.Response.StatusCode = (int)statusCode;

@@ -101,7 +101,7 @@ try
     using (var scope = app.Services.CreateScope())
     {
         var dbContext = scope.ServiceProvider.GetRequiredService<ClaimDbContext>();
-        dbContext.Database.EnsureCreated();
+        dbContext.Database.Migrate();
         
         if (!dbContext.Claims.Any())
         {
@@ -113,7 +113,6 @@ try
                 IncidentDate = DateTime.UtcNow.AddDays(-10),
                 ClaimAmount = 4500.00m,
                 Description = "Vehicle bumper collision damage repair.",
-                SupportingDocumentUrl = "https://example.com/docs/incident-report-001.pdf",
                 Status = ClaimStatus.UnderReview,
                 SubmittedAt = DateTime.UtcNow.AddDays(-9),
                 Remarks = "Awaiting adjuster assessment."

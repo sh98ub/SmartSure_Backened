@@ -72,11 +72,10 @@ namespace SmartSure.Tests
 
             var submitted = await claimService.SubmitClaimAsync(new SubmitClaimDto
             {
-                UserId = 42,
                 UserPolicyId = 1,
                 ClaimAmount = 500m,
                 Description = "User 42 claim"
-            });
+            }, 42);
 
             // Act
             var result = await controller.GetMyClaimById(submitted.Id);
@@ -107,11 +106,10 @@ namespace SmartSure.Tests
 
             var submitted = await claimService.SubmitClaimAsync(new SubmitClaimDto
             {
-                UserId = 100,
                 UserPolicyId = 1,
                 ClaimAmount = 750m,
                 Description = "User 100 claim"
-            });
+            }, 100);
 
             // Act - User 999 attempting to view User 100's claim
             var result = await controller.GetMyClaimById(submitted.Id);

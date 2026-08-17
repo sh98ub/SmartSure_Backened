@@ -30,6 +30,15 @@ namespace ClaimService.API.Controllers
             return Ok(ApiResponse<object>.SuccessResponse(claims, "All claims retrieved successfully."));
         }
 
+        [HttpGet("unapproved")]
+        [EndpointSummary("[ADMIN ONLY] Get unapproved claims")]
+        [EndpointDescription("Requires Admin role. Returns all claims that are currently Submitted or UnderReview.")]
+        public async Task<IActionResult> GetUnapprovedClaims()
+        {
+            var claims = await _claimService.GetUnapprovedClaimsAsync();
+            return Ok(ApiResponse<object>.SuccessResponse(claims, "Unapproved claims retrieved successfully."));
+        }
+
         [HttpGet("{id:int}")]
         [EndpointSummary("[ADMIN ONLY] Get claim by ID for review")]
         [EndpointDescription("Requires Admin role. Retrieves detailed information for any claim in the system.")]

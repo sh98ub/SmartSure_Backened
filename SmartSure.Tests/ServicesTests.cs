@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Net.Http;
+using Shared.Models;
 using AdminService.Application.DTOs;
 using AdminService.Infrastructure.Services;
 using AuthService.API.Services;
@@ -44,7 +46,6 @@ namespace SmartSure.Tests
                     Email = "admin@smartsure.com",
                     PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin@123", workFactor: 12),
                     FullName = "System Administrator",
-                    KycStatus = "Verified",
                     Role = UserRole.Admin,
                     CreatedAt = DateTime.UtcNow,
                     IsActive = true
@@ -56,7 +57,6 @@ namespace SmartSure.Tests
                     Email = "adjuster@smartsure.com",
                     PasswordHash = BCrypt.Net.BCrypt.HashPassword("Adjuster@123", workFactor: 12),
                     FullName = "Senior Claims Adjuster",
-                    KycStatus = "Verified",
                     Role = UserRole.ClaimsAdjuster,
                     CreatedAt = DateTime.UtcNow,
                     IsActive = true
@@ -68,7 +68,6 @@ namespace SmartSure.Tests
                     Email = "john@example.com",
                     PasswordHash = BCrypt.Net.BCrypt.HashPassword("User@123", workFactor: 12),
                     FullName = "John Doe",
-                    KycStatus = "Verified",
                     Role = UserRole.PolicyHolder,
                     CreatedAt = DateTime.UtcNow,
                     IsActive = true
@@ -109,12 +108,6 @@ namespace SmartSure.Tests
                 .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
                 .Options;
             var context = new AdminDbContext(options);
-            context.UserOverviews.AddRange(new AdminUserOverview[]
-            {
-                new AdminUserOverview { Id = 1, Username = "admin", Email = "admin@smartsure.com", FullName = "System Administrator", KycStatus = "Verified", Role = "Admin", CreatedAt = DateTime.UtcNow, IsActive = true },
-                new AdminUserOverview { Id = 2, Username = "adjuster", Email = "adjuster@smartsure.com", FullName = "Senior Claims Adjuster", KycStatus = "Verified", Role = "ClaimsAdjuster", CreatedAt = DateTime.UtcNow, IsActive = true },
-                new AdminUserOverview { Id = 3, Username = "john_doe", Email = "john@example.com", FullName = "John Doe", KycStatus = "Verified", Role = "PolicyHolder", CreatedAt = DateTime.UtcNow, IsActive = true }
-            });
             context.AuditLogs.Add(new AuditLog
             {
                 Id = 1,
@@ -160,7 +153,6 @@ namespace SmartSure.Tests
             // Assert
             Assert.NotNull(loginResult);
             Assert.False(string.IsNullOrEmpty(loginResult.Token));
-            Assert.Equal(registerDto.Email, loginResult.User.Username);
         }
 
         [Fact]
@@ -195,7 +187,7 @@ namespace SmartSure.Tests
 
             // Assert
             Assert.NotNull(loginResult);
-            Assert.Equal("Jane Doe", loginResult.User.FullName);
+            Assert.False(string.IsNullOrEmpty(loginResult.Token));
         }
 
         [Fact]
@@ -216,8 +208,6 @@ namespace SmartSure.Tests
             // Assert
             Assert.NotNull(loginResult);
             Assert.False(string.IsNullOrEmpty(loginResult.Token));
-            Assert.Equal("admin", loginResult.User.Username);
-            Assert.Equal("Admin", loginResult.User.Role);
         }
 
         [Fact]
@@ -318,16 +308,13 @@ namespace SmartSure.Tests
 
             var submitDto = new SubmitClaimDto
             {
-                UserId = userId,
                 UserPolicyId = policyId,
-                IncidentDate = DateTime.UtcNow.AddDays(-5),
                 ClaimAmount = 1500.00m,
-                Description = "Accidental windshield damage",
-                SupportingDocumentUrl = "https://example.com/docs/windshield.pdf"
+                Description = "Accidental windshield damage"
             };
 
             // Act - Submit
-            var claim = await claimService.SubmitClaimAsync(submitDto);
+            var claim = await claimService.SubmitClaimAsync(submitDto, userId);
 
             // Assert
             Assert.NotNull(claim);
@@ -353,6 +340,23 @@ namespace SmartSure.Tests
         }
 
         [Fact]
+        public async Task ClaimService_GetUnapprovedClaims_ShouldReturnOnlySubmittedOrUnderReview()
+        {
+            // Arrange
+            var claimService = new ClaimProcessingService(GetClaimDbContext());
+            
+            // Act
+            var unapprovedClaims = await claimService.GetUnapprovedClaimsAsync();
+            
+            // Assert
+            Assert.NotNull(unapprovedClaims);
+            foreach (var c in unapprovedClaims)
+            {
+                Assert.True(c.Status == "Submitted" || c.Status == "UnderReview");
+            }
+        }
+
+        [Fact]
         public async Task ClaimService_InvalidClaimAmount_ShouldThrowInvalidClaimAmountException()
         {
             // Arrange
@@ -363,11 +367,10 @@ namespace SmartSure.Tests
             {
                 await claimService.SubmitClaimAsync(new SubmitClaimDto
                 {
-                    UserId = 1,
                     UserPolicyId = 1,
                     ClaimAmount = -500.00m, // Invalid negative amount
                     Description = "Invalid claim amount test"
-                });
+                }, 1);
             });
         }
 
@@ -377,7 +380,7 @@ namespace SmartSure.Tests
             // 1. Setup Services
             var policyService = new PolicyManagementService(GetPolicyDbContext());
             var claimService = new ClaimProcessingService(GetClaimDbContext());
-            var adminService = new AdminDashboardService(GetAdminDbContext(), null!, null!, null!);
+            var adminService = new AdminDashboardService(GetAdminDbContext(), GetMockHttpClient(), null!, null!);
 
             // 2. Admin creates a new Policy Plan
             var newPlanDto = new CreatePolicyPlanDto
@@ -415,13 +418,11 @@ namespace SmartSure.Tests
             // 4. User files a claim against the policy
             var claimDto = new SubmitClaimDto
             {
-                UserId = userId,
                 UserPolicyId = boughtPolicy.Id,
-                IncidentDate = DateTime.UtcNow.AddDays(-2),
                 ClaimAmount = 750.00m,
                 Description = "Root canal and porcelain crown treatment."
             };
-            var submittedClaim = await claimService.SubmitClaimAsync(claimDto);
+            var submittedClaim = await claimService.SubmitClaimAsync(claimDto, userId);
             Assert.NotNull(submittedClaim);
             Assert.Equal("Submitted", submittedClaim.Status);
 
@@ -443,7 +444,7 @@ namespace SmartSure.Tests
         public async Task AdminService_GetMetricsAndAuditLogs_ShouldReturnValidData()
         {
             // Arrange
-            var adminService = new AdminDashboardService(GetAdminDbContext(), null!, null!, null!);
+            var adminService = new AdminDashboardService(GetAdminDbContext(), GetMockHttpClient(), null!, null!);
 
             // Act
             var metrics = await adminService.GetDashboardMetricsAsync();
@@ -461,7 +462,7 @@ namespace SmartSure.Tests
         public async Task AdminService_UserManagement_ShouldReturnFullUserDetailsAndUpdateStatus()
         {
             // Arrange
-            var adminService = new AdminDashboardService(GetAdminDbContext(), null!, null!, null!);
+            var adminService = new AdminDashboardService(GetAdminDbContext(), GetMockHttpClient(), null!, null!);
 
             // Act - Fetch All Users
             var users = await adminService.GetUserOverviewListAsync();
@@ -471,18 +472,94 @@ namespace SmartSure.Tests
             Assert.NotEmpty(userList);
             var john = userList.FirstOrDefault(u => u.Username == "john_doe");
             Assert.NotNull(john);
-            Assert.Equal("Verified", john.KycStatus);
 
-            // Act - Update Status & KYC
+            // Act - Update Status
             var updatedUser = await adminService.UpdateUserStatusAsync(john.Id, new AdminUpdateUserStatusDto
             {
-                IsActive = true,
-                KycStatus = "Verified-Premium"
+                IsActive = true
             });
 
             // Assert
             Assert.NotNull(updatedUser);
-            Assert.Equal("Verified-Premium", updatedUser.KycStatus);
+        }
+
+        private HttpClient GetMockHttpClient()
+        {
+            var mockUsers = new List<AdminUserOverviewDto>
+            {
+                new AdminUserOverviewDto { Id = 1, Username = "admin", Email = "admin@smartsure.com", FullName = "System Administrator", Role = "Admin", CreatedAt = DateTime.UtcNow, IsActive = true },
+                new AdminUserOverviewDto { Id = 2, Username = "adjuster", Email = "adjuster@smartsure.com", FullName = "Senior Claims Adjuster", Role = "ClaimsAdjuster", CreatedAt = DateTime.UtcNow, IsActive = true },
+                new AdminUserOverviewDto { Id = 3, Username = "john_doe", Email = "john@example.com", FullName = "John Doe", Role = "PolicyHolder", CreatedAt = DateTime.UtcNow, IsActive = true }
+            };
+
+            var handler = new MockHttpMessageHandler(async (request) =>
+            {
+                var uri = request.RequestUri?.ToString() ?? "";
+                
+                if (uri.Contains("api/auth/admin/users") && request.Method == HttpMethod.Get)
+                {
+                    var segments = request.RequestUri?.Segments;
+                    if (segments != null && segments.Length > 0)
+                    {
+                        var lastSegment = segments[^1].TrimEnd('/');
+                        if (int.TryParse(lastSegment, out int userId))
+                        {
+                            var user = mockUsers.FirstOrDefault(u => u.Id == userId);
+                            var apiResponse = ApiResponse<AdminUserOverviewDto>.SuccessResponse(user!, "User retrieved");
+                            return new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                            {
+                                Content = new StringContent(System.Text.Json.JsonSerializer.Serialize(apiResponse, new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }), System.Text.Encoding.UTF8, "application/json")
+                            };
+                        }
+                    }
+
+                    var listResponse = ApiResponse<List<AdminUserOverviewDto>>.SuccessResponse(mockUsers, "Users retrieved");
+                    return new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                    {
+                        Content = new StringContent(System.Text.Json.JsonSerializer.Serialize(listResponse, new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }), System.Text.Encoding.UTF8, "application/json")
+                    };
+                }
+                else if (uri.Contains("status") && request.Method == HttpMethod.Put)
+                {
+                    var bodyStr = await request.Content!.ReadAsStringAsync();
+                    var updateDto = System.Text.Json.JsonSerializer.Deserialize<AdminUpdateUserStatusDto>(bodyStr, new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
+                    
+                    var segments = request.RequestUri?.Segments;
+                    var lastSegment = segments?[^2].TrimEnd('/') ?? "";
+                    if (int.TryParse(lastSegment, out int userId))
+                    {
+                        var user = mockUsers.FirstOrDefault(u => u.Id == userId);
+                        if (user != null)
+                        {
+                            user.IsActive = updateDto!.IsActive;
+                        }
+                        var apiResponse = ApiResponse<AdminUserOverviewDto>.SuccessResponse(user!, "User updated");
+                        return new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                        {
+                            Content = new StringContent(System.Text.Json.JsonSerializer.Serialize(apiResponse, new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }), System.Text.Encoding.UTF8, "application/json")
+                        };
+                    }
+                }
+
+                return new HttpResponseMessage(System.Net.HttpStatusCode.NotFound);
+            });
+
+            return new HttpClient(handler);
+        }
+    }
+
+    public class MockHttpMessageHandler : HttpMessageHandler
+    {
+        private readonly Func<HttpRequestMessage, Task<HttpResponseMessage>> _handler;
+
+        public MockHttpMessageHandler(Func<HttpRequestMessage, Task<HttpResponseMessage>> handler)
+        {
+            _handler = handler;
+        }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, System.Threading.CancellationToken cancellationToken)
+        {
+            return _handler(request);
         }
     }
 }

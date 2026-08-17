@@ -28,9 +28,8 @@ namespace ClaimService.API.Controllers
         public async Task<IActionResult> SubmitClaim([FromBody] SubmitClaimDto dto)
         {
             var userId = GetCurrentUserId();
-            dto.UserId = userId; // Force the logged-in user ID into the claim submission DTO
 
-            var claim = await _claimService.SubmitClaimAsync(dto);
+            var claim = await _claimService.SubmitClaimAsync(dto, userId);
             return StatusCode(201, ApiResponse<ClaimDto>.SuccessResponse(claim, "Claim submitted successfully."));
         }
 

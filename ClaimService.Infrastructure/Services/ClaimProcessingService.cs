@@ -29,18 +29,14 @@ namespace ClaimService.Infrastructure.Services
             _policyServiceUrl = configuration?.GetSection("ServiceUrls")?["PolicyService"] ?? "http://localhost:5002";
         }
 
-        public async Task<ClaimDto> SubmitClaimAsync(SubmitClaimDto dto)
+        public async Task<ClaimDto> SubmitClaimAsync(SubmitClaimDto dto, int userId)
         {
             if (dto.ClaimAmount <= 0)
             {
                 throw new InvalidClaimAmountException(dto.ClaimAmount);
             }
 
-            var incidentDate = dto.IncidentDate ?? DateTime.UtcNow;
-            if (incidentDate > DateTime.UtcNow)
-            {
-                throw new ArgumentException("Incident date cannot be in the future.");
-            }
+            var incidentDate = DateTime.UtcNow;
 
             if (_httpClient != null)
             {
@@ -63,11 +59,10 @@ namespace ClaimService.Infrastructure.Services
             var claim = new Claim
             {
                 UserPolicyId = dto.UserPolicyId,
-                UserId = dto.UserId ?? 1,
+                UserId = userId,
                 IncidentDate = incidentDate,
                 ClaimAmount = dto.ClaimAmount,
                 Description = dto.Description,
-                SupportingDocumentUrl = dto.SupportingDocumentUrl,
                 Status = ClaimStatus.Submitted,
                 SubmittedAt = DateTime.UtcNow,
                 Remarks = "Submitted successfully."
@@ -88,6 +83,14 @@ namespace ClaimService.Infrastructure.Services
         public async Task<IEnumerable<ClaimDto>> GetAllClaimsAsync()
         {
             var claims = await _context.Claims.ToListAsync();
+            return claims.Select(MapToDto).ToList();
+        }
+
+        public async Task<IEnumerable<ClaimDto>> GetUnapprovedClaimsAsync()
+        {
+            var claims = await _context.Claims
+                .Where(c => c.Status == ClaimStatus.Submitted || c.Status == ClaimStatus.UnderReview)
+                .ToListAsync();
             return claims.Select(MapToDto).ToList();
         }
 
@@ -145,7 +148,6 @@ namespace ClaimService.Infrastructure.Services
                 IncidentDate = claim.IncidentDate,
                 ClaimAmount = claim.ClaimAmount,
                 Description = claim.Description,
-                SupportingDocumentUrl = claim.SupportingDocumentUrl,
                 Status = claim.Status.ToString(),
                 Remarks = claim.Remarks,
                 SubmittedAt = claim.SubmittedAt,

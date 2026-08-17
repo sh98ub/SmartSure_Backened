@@ -100,7 +100,7 @@ try
     using (var scope = app.Services.CreateScope())
     {
         var dbContext = scope.ServiceProvider.GetRequiredService<AuthDbContext>();
-        dbContext.Database.EnsureCreated();
+        dbContext.Database.Migrate();
         
         if (!dbContext.Users.Any())
         {
@@ -112,7 +112,6 @@ try
                     Email = "admin@smartsure.com",
                     PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin@123", workFactor: 12),
                     FullName = "System Administrator",
-                    KycStatus = "Verified",
                     Role = UserRole.Admin,
                     CreatedAt = DateTime.UtcNow,
                     IsActive = true
@@ -123,7 +122,6 @@ try
                     Email = "adjuster@smartsure.com",
                     PasswordHash = BCrypt.Net.BCrypt.HashPassword("Adjuster@123", workFactor: 12),
                     FullName = "Senior Claims Adjuster",
-                    KycStatus = "Verified",
                     Role = UserRole.ClaimsAdjuster,
                     CreatedAt = DateTime.UtcNow,
                     IsActive = true
@@ -134,7 +132,6 @@ try
                     Email = "john@example.com",
                     PasswordHash = BCrypt.Net.BCrypt.HashPassword("User@123", workFactor: 12),
                     FullName = "John Doe",
-                    KycStatus = "Verified",
                     Role = UserRole.PolicyHolder,
                     CreatedAt = DateTime.UtcNow,
                     IsActive = true

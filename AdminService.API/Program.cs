@@ -102,7 +102,7 @@ try
     using (var scope = app.Services.CreateScope())
     {
         var dbContext = scope.ServiceProvider.GetRequiredService<AdminDbContext>();
-        dbContext.Database.EnsureCreated();
+        dbContext.Database.Migrate();
         
         if (!dbContext.AuditLogs.Any())
         {
@@ -125,17 +125,6 @@ try
                     Details = "Adjuster assigned to claim CLM-2026-0001.",
                     IpAddress = "192.168.1.45"
                 }
-            });
-            dbContext.SaveChanges();
-        }
-
-        if (!dbContext.UserOverviews.Any())
-        {
-            dbContext.UserOverviews.AddRange(new AdminUserOverview[]
-            {
-                new AdminUserOverview { Username = "admin", Email = "admin@smartsure.com", FullName = "System Administrator", KycStatus = "Verified", Role = "Admin", CreatedAt = DateTime.UtcNow, IsActive = true },
-                new AdminUserOverview { Username = "adjuster", Email = "adjuster@smartsure.com", FullName = "Senior Claims Adjuster", KycStatus = "Verified", Role = "ClaimsAdjuster", CreatedAt = DateTime.UtcNow, IsActive = true },
-                new AdminUserOverview { Username = "john_doe", Email = "john@example.com", FullName = "John Doe", KycStatus = "Verified", Role = "PolicyHolder", CreatedAt = DateTime.UtcNow, IsActive = true }
             });
             dbContext.SaveChanges();
         }

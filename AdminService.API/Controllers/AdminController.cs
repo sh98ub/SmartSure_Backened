@@ -28,24 +28,6 @@ namespace AdminService.API.Controllers
             return Ok(ApiResponse<SystemDashboardMetricsDto>.SuccessResponse(metrics, "Dashboard metrics retrieved successfully."));
         }
 
-        [HttpGet("audit-logs")]
-        [EndpointSummary("[ADMIN ONLY] Get all audit logs")]
-        [EndpointDescription("Requires Admin role. Returns all activity audit log entries.")]
-        public async Task<IActionResult> GetAuditLogs()
-        {
-            var logs = await _adminService.GetAuditLogsAsync();
-            return Ok(ApiResponse<object>.SuccessResponse(logs, "Audit logs retrieved successfully."));
-        }
-
-        [HttpPost("audit-logs")]
-        [EndpointSummary("[ADMIN ONLY] Create audit log entry")]
-        [EndpointDescription("Requires Admin role. Manually logs an activity entry into the audit trail.")]
-        public async Task<IActionResult> CreateAuditLog([FromBody] CreateAuditLogDto dto)
-        {
-            var log = await _adminService.LogActivityAsync(dto);
-            return Ok(ApiResponse<AuditLogDto>.SuccessResponse(log, "Audit log created successfully."));
-        }
-
         [HttpGet("users")]
         [EndpointSummary("[ADMIN ONLY] Get all users overview")]
         [EndpointDescription("Requires Admin role. Returns a summary list of all registered users.")]
@@ -71,6 +53,15 @@ namespace AdminService.API.Controllers
         {
             var updatedUser = await _adminService.UpdateUserStatusAsync(id, dto);
             return Ok(ApiResponse<AdminUserOverviewDto>.SuccessResponse(updatedUser, "User status updated successfully."));
+        }
+
+        [HttpGet("claims/unapproved")]
+        [EndpointSummary("[ADMIN ONLY] Get all unapproved claims")]
+        [EndpointDescription("Requires Admin role. Returns all claims that are currently Submitted or UnderReview.")]
+        public async Task<IActionResult> GetUnapprovedClaims()
+        {
+            var claims = await _adminService.GetUnapprovedClaimsAsync();
+            return Ok(ApiResponse<object>.SuccessResponse(claims, "Unapproved claims retrieved successfully."));
         }
     }
 }

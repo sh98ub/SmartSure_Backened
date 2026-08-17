@@ -37,7 +37,6 @@ namespace AuthService.Infrasturcture.Services
                 Email = dto.Email,
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password, workFactor: 12),
                 FullName = dto.Name,
-                KycStatus = "Pending",
                 Role = UserRole.PolicyHolder,  // always force PolicyHolder — never trust user input
                 CreatedAt = DateTime.UtcNow,
                 IsActive = true
@@ -68,9 +67,7 @@ namespace AuthService.Infrasturcture.Services
 
             return new AuthResponseDto
             {
-                Token = token,
-                User = MapToDto(user),
-                ExpiresAt = expiresAt
+                Token = token
             };
         }
 
@@ -99,10 +96,6 @@ namespace AuthService.Infrasturcture.Services
             }
 
             user.IsActive = dto.IsActive;
-            if (!string.IsNullOrWhiteSpace(dto.KycStatus))
-            {
-                user.KycStatus = dto.KycStatus;
-            }
 
             await _context.SaveChangesAsync();
 
@@ -117,7 +110,6 @@ namespace AuthService.Infrasturcture.Services
                 Username = user.Username,
                 Email = user.Email,
                 FullName = user.FullName,
-                KycStatus = user.KycStatus,
                 Role = user.Role.ToString(),
                 CreatedAt = user.CreatedAt,
                 IsActive = user.IsActive

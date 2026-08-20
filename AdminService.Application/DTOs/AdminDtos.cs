@@ -3,29 +3,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace AdminService.Application.DTOs
 {
-    public class AuditLogDto
-    {
-        public int Id { get; set; }
-        public DateTime Timestamp { get; set; }
-        public string Actor { get; set; } = string.Empty;
-        public string Action { get; set; } = string.Empty;
-        public string Details { get; set; } = string.Empty;
-        public string IpAddress { get; set; } = string.Empty;
-    }
 
-    public class CreateAuditLogDto
-    {
-        [Required(ErrorMessage = "Actor is required.")]
-        public string Actor { get; set; } = string.Empty;
-
-        [Required(ErrorMessage = "Action is required.")]
-        public string Action { get; set; } = string.Empty;
-
-        [Required(ErrorMessage = "Details are required.")]
-        public string Details { get; set; } = string.Empty;
-
-        public string IpAddress { get; set; } = "127.0.0.1";
-    }
 
     public class SystemDashboardMetricsDto
     {

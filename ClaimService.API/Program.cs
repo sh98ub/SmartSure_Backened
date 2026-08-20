@@ -93,6 +93,7 @@ try
         options.UseSqlServer(builder.Configuration.GetConnectionString("ClaimDb")));
     builder.Services.AddHttpContextAccessor();
     builder.Services.AddHttpClient();
+    builder.Services.AddScoped<IClaimRepository, ClaimService.Infrastructure.Repositories.ClaimRepository>();
     builder.Services.AddScoped<IClaimProcessingService, ClaimProcessingService>();
 
     var app = builder.Build();
@@ -113,7 +114,7 @@ try
                 IncidentDate = DateTime.UtcNow.AddDays(-10),
                 ClaimAmount = 4500.00m,
                 Description = "Vehicle bumper collision damage repair.",
-                Status = ClaimStatus.UnderReview,
+                Status = "Submitted",
                 SubmittedAt = DateTime.UtcNow.AddDays(-9),
                 Remarks = "Awaiting adjuster assessment."
             };

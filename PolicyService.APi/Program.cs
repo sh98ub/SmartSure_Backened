@@ -92,6 +92,8 @@ try
     builder.Services.AddDbContext<PolicyDbContext>(options =>
         options.UseSqlServer(builder.Configuration.GetConnectionString("PolicyDb")));
 
+    builder.Services.AddScoped<IPolicyPlanRepository, PolicyService.Infrastructure.Repositories.PolicyPlanRepository>();
+    builder.Services.AddScoped<IUserPolicyRepository, PolicyService.Infrastructure.Repositories.UserPolicyRepository>();
     builder.Services.AddScoped<IPolicyManagementService, PolicyManagementService>();
 
     var app = builder.Build();

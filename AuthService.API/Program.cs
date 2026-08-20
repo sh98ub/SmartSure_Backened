@@ -92,6 +92,7 @@ try
         options.UseSqlServer(builder.Configuration.GetConnectionString("AuthDb")));
 
     builder.Services.AddSingleton<IJwtTokenGenerator, AuthService.API.Services.JwtTokenGenerator>();
+    builder.Services.AddScoped<IUserRepository, AuthService.Infrasturcture.Repositories.UserRepository>();
     builder.Services.AddScoped<IUserService, UserService>();
 
     var app = builder.Build();

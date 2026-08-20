@@ -25,7 +25,11 @@ using AuthService.Infrasturcture.Data;
 using PolicyService.Infrastructure.Data;
 using ClaimService.Infrastructure.Data;
 using AdminService.Infrastructure.Data;
-using AdminService.Domain;
+using AuthService.Infrasturcture.Repositories;
+using PolicyService.Infrastructure.Repositories;
+using ClaimService.Infrastructure.Repositories;
+
+
 
 namespace SmartSure.Tests
 {
@@ -108,14 +112,6 @@ namespace SmartSure.Tests
                 .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
                 .Options;
             var context = new AdminDbContext(options);
-            context.AuditLogs.Add(new AuditLog
-            {
-                Id = 1,
-                Timestamp = DateTime.UtcNow,
-                Actor = "Admin",
-                Action = "Create Plan",
-                Details = "Created plan"
-            });
             context.SaveChanges();
             return context;
         }
@@ -125,7 +121,7 @@ namespace SmartSure.Tests
         {
             // Arrange
             var jwtGen = new JwtTokenGenerator();
-            var userService = new UserService(GetAuthDbContext(), jwtGen);
+            var userService = new UserService(new UserRepository(GetAuthDbContext()), jwtGen);
             var registerDto = new RegisterDto
             {
                 Email = "testuser@example.com",
@@ -160,7 +156,7 @@ namespace SmartSure.Tests
         {
             // Arrange
             var jwtGen = new JwtTokenGenerator();
-            var userService = new UserService(GetAuthDbContext(), jwtGen);
+            var userService = new UserService(new UserRepository(GetAuthDbContext()), jwtGen);
             var email = "simple_" + Guid.NewGuid().ToString("N").Substring(0, 6) + "@example.com";
             var registerDto = new RegisterDto
             {
@@ -195,7 +191,7 @@ namespace SmartSure.Tests
         {
             // Arrange
             var jwtGen = new JwtTokenGenerator();
-            var userService = new UserService(GetAuthDbContext(), jwtGen);
+            var userService = new UserService(new UserRepository(GetAuthDbContext()), jwtGen);
             var adminLoginDto = new LoginDto
             {
                 Username = "admin",
@@ -215,7 +211,7 @@ namespace SmartSure.Tests
         {
             // Arrange
             var jwtGen = new JwtTokenGenerator();
-            var userService = new UserService(GetAuthDbContext(), jwtGen);
+            var userService = new UserService(new UserRepository(GetAuthDbContext()), jwtGen);
 
             // Act & Assert
             await Assert.ThrowsAsync<UserAlreadyExistsException>(async () =>
@@ -234,7 +230,7 @@ namespace SmartSure.Tests
         {
             // Arrange
             var jwtGen = new JwtTokenGenerator();
-            var userService = new UserService(GetAuthDbContext(), jwtGen);
+            var userService = new UserService(new UserRepository(GetAuthDbContext()), jwtGen);
 
             // Act & Assert
             await Assert.ThrowsAsync<InvalidCredentialsException>(async () =>
@@ -251,7 +247,8 @@ namespace SmartSure.Tests
         public async Task PolicyService_GetPlansAndSubscribe_ShouldCreateActiveUserPolicy()
         {
             // Arrange
-            var policyService = new PolicyManagementService(GetPolicyDbContext());
+            var policyDbContext = GetPolicyDbContext();
+            var policyService = new PolicyManagementService(new PolicyPlanRepository(policyDbContext), new UserPolicyRepository(policyDbContext));
 
             // Act
             var plans = await policyService.GetPolicyPlansAsync();
@@ -285,7 +282,8 @@ namespace SmartSure.Tests
         public async Task PolicyService_SubscribeInvalidPlan_ShouldThrowPolicyPlanNotFoundException()
         {
             // Arrange
-            var policyService = new PolicyManagementService(GetPolicyDbContext());
+            var policyDbContext = GetPolicyDbContext();
+            var policyService = new PolicyManagementService(new PolicyPlanRepository(policyDbContext), new UserPolicyRepository(policyDbContext));
 
             // Act & Assert
             await Assert.ThrowsAsync<PolicyPlanNotFoundException>(async () =>
@@ -302,7 +300,7 @@ namespace SmartSure.Tests
         public async Task ClaimService_SubmitAndReviewClaim_ShouldUpdateStatusAndPayout()
         {
             // Arrange
-            var claimService = new ClaimProcessingService(GetClaimDbContext());
+            var claimService = new ClaimProcessingService(new ClaimRepository(GetClaimDbContext()));
             int userId = 101;
             int policyId = 1;
 
@@ -326,7 +324,7 @@ namespace SmartSure.Tests
             var reviewDto = new ReviewClaimDto
             {
                 ClaimId = claim.Id,
-                Status = ClaimStatus.Approved,
+                Status = "Approved",
                 ApprovedPayoutAmount = 1400.00m,
                 Remarks = "Approved after coverage deductible calculation."
             };
@@ -343,7 +341,7 @@ namespace SmartSure.Tests
         public async Task ClaimService_GetUnapprovedClaims_ShouldReturnOnlySubmittedOrUnderReview()
         {
             // Arrange
-            var claimService = new ClaimProcessingService(GetClaimDbContext());
+            var claimService = new ClaimProcessingService(new ClaimRepository(GetClaimDbContext()));
             
             // Act
             var unapprovedClaims = await claimService.GetUnapprovedClaimsAsync();
@@ -352,7 +350,7 @@ namespace SmartSure.Tests
             Assert.NotNull(unapprovedClaims);
             foreach (var c in unapprovedClaims)
             {
-                Assert.True(c.Status == "Submitted" || c.Status == "UnderReview");
+                Assert.Equal("Submitted", c.Status);
             }
         }
 
@@ -360,7 +358,7 @@ namespace SmartSure.Tests
         public async Task ClaimService_InvalidClaimAmount_ShouldThrowInvalidClaimAmountException()
         {
             // Arrange
-            var claimService = new ClaimProcessingService(GetClaimDbContext());
+            var claimService = new ClaimProcessingService(new ClaimRepository(GetClaimDbContext()));
 
             // Act & Assert
             await Assert.ThrowsAsync<InvalidClaimAmountException>(async () =>
@@ -378,9 +376,10 @@ namespace SmartSure.Tests
         public async Task AdminCreatesPolicy_UserBuysPolicy_UserClaims_AdminApproves_EndToEndWorkflow()
         {
             // 1. Setup Services
-            var policyService = new PolicyManagementService(GetPolicyDbContext());
-            var claimService = new ClaimProcessingService(GetClaimDbContext());
-            var adminService = new AdminDashboardService(GetAdminDbContext(), GetMockHttpClient(), null!, null!);
+            var policyDbContext = GetPolicyDbContext();
+            var policyService = new PolicyManagementService(new PolicyPlanRepository(policyDbContext), new UserPolicyRepository(policyDbContext));
+            var claimService = new ClaimProcessingService(new ClaimRepository(GetClaimDbContext()));
+            var adminService = new AdminDashboardService(GetMockHttpClient(), null!, null!);
 
             // 2. Admin creates a new Policy Plan
             var newPlanDto = new CreatePolicyPlanDto
@@ -396,13 +395,7 @@ namespace SmartSure.Tests
             Assert.NotNull(createdPlan);
             Assert.True(createdPlan.Id > 0);
 
-            // Log Admin activity
-            await adminService.LogActivityAsync(new CreateAuditLogDto
-            {
-                Actor = "Admin",
-                Action = "Create Policy Plan",
-                Details = $"Created policy plan {createdPlan.Title}"
-            });
+
 
             // 3. User buys the newly created policy
             int userId = 501;
@@ -430,7 +423,7 @@ namespace SmartSure.Tests
             var reviewDto = new ReviewClaimDto
             {
                 ClaimId = submittedClaim.Id,
-                Status = ClaimStatus.Approved,
+                Status = "Approved",
                 ApprovedPayoutAmount = 750.00m,
                 Remarks = "Full payout approved by Admin"
             };
@@ -441,28 +434,25 @@ namespace SmartSure.Tests
         }
 
         [Fact]
-        public async Task AdminService_GetMetricsAndAuditLogs_ShouldReturnValidData()
+        public async Task AdminService_GetMetrics_ShouldReturnValidData()
         {
             // Arrange
-            var adminService = new AdminDashboardService(GetAdminDbContext(), GetMockHttpClient(), null!, null!);
+            var adminService = new AdminDashboardService(GetMockHttpClient(), null!, null!);
 
             // Act
             var metrics = await adminService.GetDashboardMetricsAsync();
-            var logs = await adminService.GetAuditLogsAsync();
 
             // Assert
             Assert.NotNull(metrics);
             Assert.True(metrics.TotalUsers > 0);
             Assert.True(metrics.ActivePolicies > 0);
-            Assert.NotNull(logs);
-            Assert.NotEmpty(logs);
         }
 
         [Fact]
         public async Task AdminService_UserManagement_ShouldReturnFullUserDetailsAndUpdateStatus()
         {
             // Arrange
-            var adminService = new AdminDashboardService(GetAdminDbContext(), GetMockHttpClient(), null!, null!);
+            var adminService = new AdminDashboardService(GetMockHttpClient(), null!, null!);
 
             // Act - Fetch All Users
             var users = await adminService.GetUserOverviewListAsync();
@@ -481,6 +471,85 @@ namespace SmartSure.Tests
 
             // Assert
             Assert.NotNull(updatedUser);
+        }
+
+        [Fact]
+        public async Task ClaimService_SubmitClaimOnCancelledPolicy_ShouldThrowPolicyAlreadyCancelledException()
+        {
+            // Arrange
+            var policyId = 123;
+            var userId = 501;
+            
+            // Mock HttpClient to return a policy with Cancelled status
+            var mockHandler = new MockHttpMessageHandler(async (request) =>
+            {
+                var response = new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                {
+                    Content = new StringContent(
+                        "{\"id\":" + policyId + ",\"userId\":" + userId + ",\"status\":\"Cancelled\"}",
+                        System.Text.Encoding.UTF8,
+                        "application/json"
+                    )
+                };
+                return response;
+            });
+            
+            var httpClient = new HttpClient(mockHandler);
+            var claimService = new ClaimProcessingService(new ClaimRepository(GetClaimDbContext()), httpClient);
+            
+            var submitDto = new SubmitClaimDto
+            {
+                UserPolicyId = policyId,
+                ClaimAmount = 500.00m,
+                Description = "Dental claim"
+            };
+
+            // Act & Assert
+            var exception = await Assert.ThrowsAsync<ClaimService.Domain.Exceptions.PolicyAlreadyCancelledException>(async () =>
+            {
+                await claimService.SubmitClaimAsync(submitDto, userId);
+            });
+            
+            Assert.Contains("cancelled", exception.Message);
+        }
+
+        [Fact]
+        public async Task ClaimService_SubmitClaimOnActivePolicy_ShouldSucceed()
+        {
+            // Arrange
+            var policyId = 123;
+            var userId = 501;
+            
+            // Mock HttpClient to return a policy with Active status
+            var mockHandler = new MockHttpMessageHandler(async (request) =>
+            {
+                var response = new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                {
+                    Content = new StringContent(
+                        "{\"id\":" + policyId + ",\"userId\":" + userId + ",\"status\":\"Active\"}",
+                        System.Text.Encoding.UTF8,
+                        "application/json"
+                    )
+                };
+                return response;
+            });
+            
+            var httpClient = new HttpClient(mockHandler);
+            var claimService = new ClaimProcessingService(new ClaimRepository(GetClaimDbContext()), httpClient);
+            
+            var submitDto = new SubmitClaimDto
+            {
+                UserPolicyId = policyId,
+                ClaimAmount = 500.00m,
+                Description = "Dental claim"
+            };
+
+            // Act
+            var claim = await claimService.SubmitClaimAsync(submitDto, userId);
+
+            // Assert
+            Assert.NotNull(claim);
+            Assert.Equal("Submitted", claim.Status);
         }
 
         private HttpClient GetMockHttpClient()
@@ -505,18 +574,16 @@ namespace SmartSure.Tests
                         if (int.TryParse(lastSegment, out int userId))
                         {
                             var user = mockUsers.FirstOrDefault(u => u.Id == userId);
-                            var apiResponse = ApiResponse<AdminUserOverviewDto>.SuccessResponse(user!, "User retrieved");
                             return new HttpResponseMessage(System.Net.HttpStatusCode.OK)
                             {
-                                Content = new StringContent(System.Text.Json.JsonSerializer.Serialize(apiResponse, new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }), System.Text.Encoding.UTF8, "application/json")
+                                Content = new StringContent(System.Text.Json.JsonSerializer.Serialize(user!, new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }), System.Text.Encoding.UTF8, "application/json")
                             };
                         }
                     }
 
-                    var listResponse = ApiResponse<List<AdminUserOverviewDto>>.SuccessResponse(mockUsers, "Users retrieved");
                     return new HttpResponseMessage(System.Net.HttpStatusCode.OK)
                     {
-                        Content = new StringContent(System.Text.Json.JsonSerializer.Serialize(listResponse, new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }), System.Text.Encoding.UTF8, "application/json")
+                        Content = new StringContent(System.Text.Json.JsonSerializer.Serialize(mockUsers, new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }), System.Text.Encoding.UTF8, "application/json")
                     };
                 }
                 else if (uri.Contains("status") && request.Method == HttpMethod.Put)
@@ -533,10 +600,9 @@ namespace SmartSure.Tests
                         {
                             user.IsActive = updateDto!.IsActive;
                         }
-                        var apiResponse = ApiResponse<AdminUserOverviewDto>.SuccessResponse(user!, "User updated");
                         return new HttpResponseMessage(System.Net.HttpStatusCode.OK)
                         {
-                            Content = new StringContent(System.Text.Json.JsonSerializer.Serialize(apiResponse, new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }), System.Text.Encoding.UTF8, "application/json")
+                            Content = new StringContent(System.Text.Json.JsonSerializer.Serialize(user!, new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }), System.Text.Encoding.UTF8, "application/json")
                         };
                     }
                 }

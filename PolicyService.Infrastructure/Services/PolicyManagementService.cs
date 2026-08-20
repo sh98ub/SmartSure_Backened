@@ -6,29 +6,42 @@ using PolicyService.Application.DTOs;
 using PolicyService.Application.Interfaces;
 using PolicyService.Domain;
 using PolicyService.Domain.Exceptions;
-using PolicyService.Infrastructure.Data;
-using Microsoft.EntityFrameworkCore;
 
 namespace PolicyService.Infrastructure.Services
 {
+    /// <summary>
+    /// Service implementation for managing policy plans and user policy subscriptions.
+    /// Interacts with the repository layer instead of the DbContext directly.
+    /// </summary>
     public class PolicyManagementService : IPolicyManagementService
     {
-        private readonly PolicyDbContext _context;
+        private readonly IPolicyPlanRepository _policyPlanRepository;
+        private readonly IUserPolicyRepository _userPolicyRepository;
 
-        public PolicyManagementService(PolicyDbContext context)
+        /// <summary>
+        /// Initializes a new instance of the PolicyManagementService.
+        /// </summary>
+        /// <param name="policyPlanRepository">The repository interface for policy plan persistence.</param>
+        /// <param name="userPolicyRepository">The repository interface for user policy subscription persistence.</param>
+        public PolicyManagementService(
+            IPolicyPlanRepository policyPlanRepository,
+            IUserPolicyRepository userPolicyRepository)
         {
-            _context = context;
+            _policyPlanRepository = policyPlanRepository;
+            _userPolicyRepository = userPolicyRepository;
         }
 
+        /// <inheritdoc />
         public async Task<IEnumerable<PolicyPlanDto>> GetPolicyPlansAsync()
         {
-            var plans = await _context.PolicyPlans.Where(p => p.IsActive).ToListAsync();
+            var plans = await _policyPlanRepository.GetActivePlansAsync();
             return plans.Select(MapToPlanDto).ToList();
         }
 
+        /// <inheritdoc />
         public async Task<PolicyPlanDto?> GetPolicyPlanByIdAsync(int id)
         {
-            var plan = await _context.PolicyPlans.FindAsync(id);
+            var plan = await _policyPlanRepository.GetByIdAsync(id);
             if (plan == null)
             {
                 throw new PolicyPlanNotFoundException(id);
@@ -36,6 +49,7 @@ namespace PolicyService.Infrastructure.Services
             return MapToPlanDto(plan);
         }
 
+        /// <inheritdoc />
         public async Task<PolicyPlanDto> CreatePolicyPlanAsync(CreatePolicyPlanDto dto)
         {
             var plan = new PolicyPlan
@@ -48,14 +62,15 @@ namespace PolicyService.Infrastructure.Services
                 DurationMonths = dto.DurationMonths,
                 IsActive = true
             };
-            _context.PolicyPlans.Add(plan);
-            await _context.SaveChangesAsync();
+            await _policyPlanRepository.AddAsync(plan);
+            await _policyPlanRepository.SaveChangesAsync();
             return MapToPlanDto(plan);
         }
 
+        /// <inheritdoc />
         public async Task<PolicyPlanDto> UpdatePolicyPlanAsync(int id, UpdatePolicyPlanDto dto)
         {
-            var plan = await _context.PolicyPlans.FindAsync(id);
+            var plan = await _policyPlanRepository.GetByIdAsync(id);
             if (plan == null)
             {
                 throw new PolicyPlanNotFoundException(id);
@@ -69,31 +84,34 @@ namespace PolicyService.Infrastructure.Services
             plan.DurationMonths = dto.DurationMonths;
             plan.IsActive = dto.IsActive;
 
-            await _context.SaveChangesAsync();
+            await _policyPlanRepository.SaveChangesAsync();
             return MapToPlanDto(plan);
         }
 
+        /// <inheritdoc />
         public async Task<bool> DeletePolicyPlanAsync(int id)
         {
-            var plan = await _context.PolicyPlans.FindAsync(id);
+            var plan = await _policyPlanRepository.GetByIdAsync(id);
             if (plan == null)
             {
                 throw new PolicyPlanNotFoundException(id);
             }
 
             plan.IsActive = false; // Soft delete
-            await _context.SaveChangesAsync();
+            await _policyPlanRepository.SaveChangesAsync();
             return true;
         }
 
+        /// <inheritdoc />
         public async Task<UserPolicyDto> SubscribePolicyAsync(SubscribePolicyDto dto)
         {
-            var plan = await _context.PolicyPlans.FindAsync(dto.PolicyPlanId);
+            var plan = await _policyPlanRepository.GetByIdAsync(dto.PolicyPlanId);
             if (plan == null || !plan.IsActive)
             {
                 throw new PolicyPlanNotFoundException(dto.PolicyPlanId);
             }
 
+            // Create new UserPolicy subscription, mapping attributes
             var policy = new UserPolicy
             {
                 UserId = dto.UserId,
@@ -108,17 +126,18 @@ namespace PolicyService.Infrastructure.Services
                 HasRecentHospitalization = dto.HasRecentHospitalization
             };
 
-            _context.UserPolicies.Add(policy);
-            await _context.SaveChangesAsync();
+            await _userPolicyRepository.AddAsync(policy);
+            await _userPolicyRepository.SaveChangesAsync();
 
             return MapToUserPolicyDto(policy, plan.Type.ToString());
         }
 
+        /// <inheritdoc />
         public async Task<IEnumerable<UserPolicyDto>> GetUserPoliciesAsync(int userId)
         {
-            var policies = await _context.UserPolicies.Where(p => p.UserId == userId).ToListAsync();
+            var policies = await _userPolicyRepository.GetByUserIdAsync(userId);
             var planIds = policies.Select(p => p.PolicyPlanId).Distinct().ToList();
-            var plans = await _context.PolicyPlans.Where(p => planIds.Contains(p.Id)).ToDictionaryAsync(p => p.Id, p => p.Type.ToString());
+            var plans = await _policyPlanRepository.GetPlanTypesAsync(planIds);
 
             return policies.Select(p => {
                 plans.TryGetValue(p.PolicyPlanId, out var type);
@@ -126,11 +145,12 @@ namespace PolicyService.Infrastructure.Services
             }).ToList();
         }
 
+        /// <inheritdoc />
         public async Task<IEnumerable<UserPolicyDto>> GetAllUserPoliciesAsync()
         {
-            var policies = await _context.UserPolicies.ToListAsync();
+            var policies = await _userPolicyRepository.GetAllAsync();
             var planIds = policies.Select(p => p.PolicyPlanId).Distinct().ToList();
-            var plans = await _context.PolicyPlans.Where(p => planIds.Contains(p.Id)).ToDictionaryAsync(p => p.Id, p => p.Type.ToString());
+            var plans = await _policyPlanRepository.GetPlanTypesAsync(planIds);
 
             return policies.Select(p => {
                 plans.TryGetValue(p.PolicyPlanId, out var type);
@@ -138,20 +158,22 @@ namespace PolicyService.Infrastructure.Services
             }).ToList();
         }
 
+        /// <inheritdoc />
         public async Task<UserPolicyDto?> GetUserPolicyByIdAsync(int id)
         {
-            var policy = await _context.UserPolicies.FindAsync(id);
+            var policy = await _userPolicyRepository.GetByIdAsync(id);
             if (policy == null)
             {
                 throw new UserPolicyNotFoundException(id);
             }
-            var plan = await _context.PolicyPlans.FindAsync(policy.PolicyPlanId);
+            var plan = await _policyPlanRepository.GetByIdAsync(policy.PolicyPlanId);
             return MapToUserPolicyDto(policy, plan?.Type.ToString() ?? string.Empty);
         }
 
+        /// <inheritdoc />
         public async Task<bool> CancelUserPolicyAsync(int id)
         {
-            var policy = await _context.UserPolicies.FindAsync(id);
+            var policy = await _userPolicyRepository.GetByIdAsync(id);
             if (policy == null)
             {
                 throw new UserPolicyNotFoundException(id);
@@ -163,10 +185,13 @@ namespace PolicyService.Infrastructure.Services
             }
 
             policy.Status = PolicyStatus.Cancelled;
-            await _context.SaveChangesAsync();
+            await _userPolicyRepository.SaveChangesAsync();
             return true;
         }
 
+        /// <summary>
+        /// Helper mapping method to convert Domain PolicyPlan entity to Application PolicyPlanDto representation.
+        /// </summary>
         private static PolicyPlanDto MapToPlanDto(PolicyPlan plan)
         {
             return new PolicyPlanDto
@@ -182,6 +207,9 @@ namespace PolicyService.Infrastructure.Services
             };
         }
 
+        /// <summary>
+        /// Helper mapping method to convert Domain UserPolicy entity to Application UserPolicyDto representation.
+        /// </summary>
         private static UserPolicyDto MapToUserPolicyDto(UserPolicy policy, string type)
         {
             return new UserPolicyDto

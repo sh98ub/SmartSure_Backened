@@ -23,6 +23,8 @@ using Microsoft.EntityFrameworkCore;
 using ClaimService.Infrastructure.Data;
 using PolicyService.Infrastructure.Data;
 using PolicyService.Domain;
+using ClaimService.Infrastructure.Repositories;
+using PolicyService.Infrastructure.Repositories;
 
 namespace SmartSure.Tests
 {
@@ -57,7 +59,7 @@ namespace SmartSure.Tests
         public async Task UserClaimsController_GetClaimById_OwnClaim_ShouldReturnOk()
         {
             // Arrange
-            var claimService = new ClaimProcessingService(GetClaimDbContext());
+            var claimService = new ClaimProcessingService(new ClaimRepository(GetClaimDbContext()));
             var controller = new UserClaimsController(claimService);
             controller.ControllerContext = new ControllerContext
             {
@@ -82,16 +84,15 @@ namespace SmartSure.Tests
 
             // Assert
             var okResult = Assert.IsType<OkObjectResult>(result);
-            var apiResponse = Assert.IsType<ApiResponse<ClaimDto>>(okResult.Value);
-            Assert.True(apiResponse.Success);
-            Assert.Equal(42, apiResponse.Data.UserId);
+            var data = Assert.IsType<ClaimDto>(okResult.Value);
+            Assert.Equal(42, data.UserId);
         }
 
         [Fact]
         public async Task UserClaimsController_GetClaimById_OtherUserClaim_ShouldReturnForbidden()
         {
             // Arrange
-            var claimService = new ClaimProcessingService(GetClaimDbContext());
+            var claimService = new ClaimProcessingService(new ClaimRepository(GetClaimDbContext()));
             var controller = new UserClaimsController(claimService);
             controller.ControllerContext = new ControllerContext
             {
@@ -123,7 +124,7 @@ namespace SmartSure.Tests
         public async Task AdminClaimsController_GetAllClaims_ShouldReturnClaimsList()
         {
             // Arrange
-            var claimService = new ClaimProcessingService(GetClaimDbContext());
+            var claimService = new ClaimProcessingService(new ClaimRepository(GetClaimDbContext()));
             var controller = new AdminClaimsController(claimService);
 
             // Act
@@ -131,16 +132,15 @@ namespace SmartSure.Tests
 
             // Assert
             var okResult = Assert.IsType<OkObjectResult>(result);
-            var apiResponse = Assert.IsType<ApiResponse<object>>(okResult.Value);
-            Assert.True(apiResponse.Success);
-            Assert.NotNull(apiResponse.Data);
+            Assert.NotNull(okResult.Value);
         }
 
         [Fact]
         public async Task UserPoliciesController_GetPolicyById_OtherUserPolicy_ShouldReturnForbidden()
         {
             // Arrange
-            var policyService = new PolicyManagementService(GetPolicyDbContext());
+            var policyDbContext = GetPolicyDbContext();
+            var policyService = new PolicyManagementService(new PolicyPlanRepository(policyDbContext), new UserPolicyRepository(policyDbContext));
             var controller = new UserPoliciesController(policyService);
             controller.ControllerContext = new ControllerContext
             {
@@ -171,7 +171,8 @@ namespace SmartSure.Tests
         public async Task UserPoliciesController_CancelPolicy_OtherUserPolicy_ShouldReturnForbidden()
         {
             // Arrange
-            var policyService = new PolicyManagementService(GetPolicyDbContext());
+            var policyDbContext = GetPolicyDbContext();
+            var policyService = new PolicyManagementService(new PolicyPlanRepository(policyDbContext), new UserPolicyRepository(policyDbContext));
             var controller = new UserPoliciesController(policyService);
             controller.ControllerContext = new ControllerContext
             {
@@ -199,10 +200,88 @@ namespace SmartSure.Tests
         }
 
         [Fact]
+        public async Task UserPoliciesController_GetMyPolicyById_CancelledPolicy_ShouldReturnNotFound()
+        {
+            // Arrange
+            var policyDbContext = GetPolicyDbContext();
+            var policyService = new PolicyManagementService(new PolicyPlanRepository(policyDbContext), new UserPolicyRepository(policyDbContext));
+            var controller = new UserPoliciesController(policyService);
+            controller.ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext
+                {
+                    User = new ClaimsPrincipal(new ClaimsIdentity(new[]
+                    {
+                        new Claim(ClaimTypes.NameIdentifier, "200")
+                    }, "TestAuth"))
+                }
+            };
+
+            var subscribed = await policyService.SubscribePolicyAsync(new SubscribePolicyDto
+            {
+                UserId = 200,
+                PolicyPlanId = 101
+            });
+
+            // Cancel the policy
+            await policyService.CancelUserPolicyAsync(subscribed.Id);
+
+            // Act
+            var result = await controller.GetMyPolicyById(subscribed.Id);
+
+            // Assert
+            Assert.IsType<NotFoundObjectResult>(result);
+        }
+
+        [Fact]
+        public async Task UserPoliciesController_GetMyPolicies_FiltersCancelledPolicies()
+        {
+            // Arrange
+            var policyDbContext = GetPolicyDbContext();
+            var policyService = new PolicyManagementService(new PolicyPlanRepository(policyDbContext), new UserPolicyRepository(policyDbContext));
+            var controller = new UserPoliciesController(policyService);
+            controller.ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext
+                {
+                    User = new ClaimsPrincipal(new ClaimsIdentity(new[]
+                    {
+                        new Claim(ClaimTypes.NameIdentifier, "200")
+                    }, "TestAuth"))
+                }
+            };
+
+            var subscribed1 = await policyService.SubscribePolicyAsync(new SubscribePolicyDto
+            {
+                UserId = 200,
+                PolicyPlanId = 101
+            });
+
+            var subscribed2 = await policyService.SubscribePolicyAsync(new SubscribePolicyDto
+            {
+                UserId = 200,
+                PolicyPlanId = 101
+            });
+
+            // Cancel the first policy
+            await policyService.CancelUserPolicyAsync(subscribed1.Id);
+
+            // Act
+            var result = await controller.GetMyPolicies();
+
+            // Assert
+            var okResult = Assert.IsType<OkObjectResult>(result);
+            var list = Assert.IsAssignableFrom<System.Collections.Generic.IEnumerable<PolicyService.Application.DTOs.UserPolicyDto>>(okResult.Value);
+            Assert.Single(list);
+            Assert.Equal(subscribed2.Id, list.First().Id);
+        }
+
+        [Fact]
         public async Task AdminPoliciesController_CreatePlan_ShouldReturnCreatedPlan()
         {
             // Arrange
-            var policyService = new PolicyManagementService(GetPolicyDbContext());
+            var policyDbContext = GetPolicyDbContext();
+            var policyService = new PolicyManagementService(new PolicyPlanRepository(policyDbContext), new UserPolicyRepository(policyDbContext));
             var controller = new AdminPoliciesController(policyService);
 
             var dto = new CreatePolicyPlanDto
@@ -221,8 +300,8 @@ namespace SmartSure.Tests
             // Assert
             var statusCodeResult = Assert.IsType<ObjectResult>(result);
             Assert.Equal(201, statusCodeResult.StatusCode);
-            var apiResponse = Assert.IsType<ApiResponse<PolicyPlanDto>>(statusCodeResult.Value);
-            Assert.Equal("Super Admin Shield", apiResponse.Data.Title);
+            var data = Assert.IsType<PolicyPlanDto>(statusCodeResult.Value);
+            Assert.Equal("Super Admin Shield", data.Title);
         }
 
         [Fact]

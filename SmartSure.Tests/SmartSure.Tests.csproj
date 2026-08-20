@@ -17,9 +17,26 @@
 
   <ItemGroup>
     <ProjectReference Include="..\AuthService.API\AuthService.API.csproj" />
+    <ProjectReference Include="..\AuthService.Application\AuthService.Application.csproj" />
+    <ProjectReference Include="..\AuthService.Domain\AuthService.Domain.csproj" />
+    <ProjectReference Include="..\AuthService.Infrasturcture\AuthService.Infrasturcture.csproj" />
+
     <ProjectReference Include="..\PolicyService.APi\PolicyService.APi.csproj" />
+    <ProjectReference Include="..\PolicyService.Application\PolicyService.Application.csproj" />
+    <ProjectReference Include="..\PolicyService.Domain\PolicyService.Domain.csproj" />
+    <ProjectReference Include="..\PolicyService.Infrastructure\PolicyService.Infrastructure.csproj" />
+
     <ProjectReference Include="..\ClaimService.API\ClaimService.API.csproj" />
+    <ProjectReference Include="..\ClaimService.Application\ClaimService.Application.csproj" />
+    <ProjectReference Include="..\ClaimService.Domain\ClaimService.Domain.csproj" />
+    <ProjectReference Include="..\ClaimService.Infrastructure\ClaimService.Infrastructure.csproj" />
+
     <ProjectReference Include="..\AdminService.API\AdminService.API.csproj" />
+    <ProjectReference Include="..\AdminService.Application\AdminService.Application.csproj" />
+    <ProjectReference Include="..\AdminService.Domain\AdminService.Domain.csproj" />
+    <ProjectReference Include="..\AdminService.Infrastructure\AdminService.Infrastructure.csproj" />
+
+    <ProjectReference Include="..\Shared\Shared.csproj" />
   </ItemGroup>
 
   <ItemGroup>

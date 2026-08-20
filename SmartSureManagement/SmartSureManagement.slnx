@@ -30,4 +30,7 @@
   <Folder Name="/Shared/">
     <Project Path="../Shared/Shared.csproj" />
   </Folder>
+  <Folder Name="/Tests/">
+    <Project Path="../SmartSure.Tests/SmartSure.Tests.csproj" />
+  </Folder>
 </Solution>

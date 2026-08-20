@@ -18,4 +18,10 @@ namespace ClaimService.Domain.Exceptions
         public InvalidClaimAmountException(decimal amount)
             : base($"Invalid claim submission: Claim amount ₹{amount} must be greater than zero.") { }
     }
+
+    public class PolicyAlreadyCancelledException : ClaimException
+    {
+        public PolicyAlreadyCancelledException(int policyId)
+            : base($"User policy '{policyId}' has already been cancelled and cannot be modified.") { }
+    }
 }

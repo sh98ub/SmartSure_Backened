@@ -23,7 +23,7 @@ namespace ClaimService.Application.DTOs
         public int ClaimId { get; set; }
 
         [Required(ErrorMessage = "Claim status is required.")]
-        public ClaimStatus Status { get; set; }
+        public string Status { get; set; } = string.Empty;
 
         [Range(0.0, double.MaxValue, ErrorMessage = "Approved payout amount cannot be negative.")]
         public decimal? ApprovedPayoutAmount { get; set; }
@@ -46,5 +46,14 @@ namespace ClaimService.Application.DTOs
         public DateTime SubmittedAt { get; set; }
         public DateTime? ReviewedAt { get; set; }
         public decimal? ApprovedPayoutAmount { get; set; }
+    }
+
+    public class Employee
+    {
+        public int Id { get; set; }
+
+        public string Name { get; set; }
+
+        public decimal salary { get; set; }
     }
 }

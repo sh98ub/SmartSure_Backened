@@ -7,7 +7,6 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Shared.Middleware;
 using Serilog;
-using AdminService.Domain;
 using AdminService.Infrastructure.Data;
 
 Log.Logger = new LoggerConfiguration()
@@ -104,30 +103,7 @@ try
         var dbContext = scope.ServiceProvider.GetRequiredService<AdminDbContext>();
         dbContext.Database.Migrate();
         
-        if (!dbContext.AuditLogs.Any())
-        {
-            dbContext.Database.ExecuteSqlRaw("DBCC CHECKIDENT ('AuditLogs', RESEED, 0);");
-            dbContext.AuditLogs.AddRange(new AuditLog[]
-            {
-                new AuditLog
-                {
-                    Timestamp = DateTime.UtcNow.AddHours(-12),
-                    Actor = "SystemAdmin",
-                    Action = "System Initialization",
-                    Details = "SmartSure Microservices stack initialized successfully.",
-                    IpAddress = "127.0.0.1"
-                },
-                new AuditLog
-                {
-                    Timestamp = DateTime.UtcNow.AddHours(-4),
-                    Actor = "Adjuster",
-                    Action = "Claim Inspection",
-                    Details = "Adjuster assigned to claim CLM-2026-0001.",
-                    IpAddress = "192.168.1.45"
-                }
-            });
-            dbContext.SaveChanges();
-        }
+
     }
 
     app.UseSerilogRequestLogging();
